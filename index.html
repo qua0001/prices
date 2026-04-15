@@ -6,15 +6,75 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>prices</title>
   <link rel="manifest" href="manifest.json">
+  <link rel=stylesheet href="styles/style.css">
 </head>
 
 <body>
-  <h1>prices</h1>
-  
+
+  <main class="main">
+    <div class="categories">
+      <div class="category">
+        <h2 class="category__title">Овощи</h2>
+      </div>
+    </div>
+    <button class="create-button"></button>
+  </main>
+
+  <div class="add-form">
+    <div class="add-form__overlay"></div>
+    <div class="add-form__content">
+      <div class="add-form__title">Новый товар</div>
+
+      <form action="">
+        <div class="add-form__field">
+          <label for="product-name">Название товара:</label>
+          <input
+           type="text"
+           name="product-name"
+           id="product-name"
+           placeholder="Введите название..."
+           required
+           autocomplete="off"
+          >
+        </div>
+        <div class="add-form__field">
+          <label for="product-price">Стоимость товара:</label>
+          <input
+           type="number"
+           min="0"
+           inputmode="decimal"
+           id="product-price"
+           required
+           placeholder="Введите стоимость..."
+          >
+        </div>
+        <div class="add-form__field">
+          <label for="product-category">Категория товара:</label>
+          <select name="product-category" id="product-category" required>
+            <option value="" disabled selected>Выберите категорию...</option>
+            <option value="vegetables">Овощи</option>
+            <option value="fruits">Фрукты</option>
+          </select>
+
+          <input
+           type="text"
+           name="add-category"
+           id="add-category"
+           placeholder="Введите название..."
+           class="add-form__hidden-input"
+          >
+
+          <button type="button" class="add-form__toggle-btn">+ Добавить новую категорию</button>
+        </div>
+        <button type="submit">Добавить</button>
+        <button type="button">Отменить</button>
+      </form>
+    </div>
+  </div>
 
   <script>
     if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
+      navigator.serviceWorker.register('sw.js');
     }
   </script>
 </body>
