@@ -12,16 +12,23 @@
 <body>
 
   <main class="main">
+    <!-- Блок для категорий -->
     <div class="categories">
+      <!-- Список категорий -->
       <div class="category">
-        <h2 class="category__title">Овощи</h2>
+        <!-- Заголовок категорий -->
+        <h2 class="category__title">Категория</h2>
       </div>
     </div>
-    <button class="create-button"></button>
+    <!-- Кнопка для создания новой категории/товара (появление предварительно созданной формы) -->
+    <button class="create-button">+</button>
   </main>
 
+  <!-- Форма добавления новой категории/товара -->
   <div class="add-form">
-    <div class="add-form__overlay"></div>
+    <!-- Затемнение основного контента, когда форма открыта -->
+    <div class="add-form__overlay"></div> 
+    <!-- Форма -->
     <div class="add-form__content">
       <div class="add-form__title">Новый товар</div>
 
@@ -33,8 +40,8 @@
            name="product-name"
            id="product-name"
            placeholder="Введите название..."
-           required
            autocomplete="off"
+           spellcheck="false"
           >
         </div>
         <div class="add-form__field">
@@ -44,8 +51,8 @@
            min="0"
            inputmode="decimal"
            id="product-price"
-           required
            placeholder="Введите стоимость..."
+           spellcheck="false"
           >
         </div>
         <div class="add-form__field">
@@ -62,12 +69,17 @@
            id="add-category"
            placeholder="Введите название..."
            class="add-form__hidden-input"
+           spellcheck="false"
           >
 
           <button type="button" class="add-form__toggle-btn">+ Добавить новую категорию</button>
         </div>
-        <button type="submit">Добавить</button>
-        <button type="button">Отменить</button>
+        <div class="add-form__field">
+          <label for="product-image">Фото товара (необязательно):</label>
+          <input type="file" id="product-image" accept="image/*" class="add-form__image-input">
+        </div>
+        <button type="submit" class="add-form__add">Добавить</button>
+        <button type="button" class="add-form__cancel">Отменить</button>
       </form>
     </div>
   </div>
