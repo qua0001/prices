@@ -191,4 +191,48 @@ button, input {
   font-size: 14px;
   color: rgb(104.6774193548, 138.5, 172.3225806452);
   max-width: 250px;
+}
+
+.product-card {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  padding: 12px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+.product-card__image {
+  width: 60px;
+  height: 60px;
+  background-color: #f0f0f0;
+  border-radius: 12px;
+  margin-right: 12px;
+  -o-object-fit: cover;
+     object-fit: cover;
+}
+.product-card__info {
+  flex-grow: 1;
+}
+.product-card__name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 4px;
+}
+.product-card__price {
+  font-size: 14px;
+  font-weight: 700;
+  color: #27ae60;
+}
+.product-card__actions {
+  display: flex;
+  gap: 8px;
+}
+.product-card__edit-btn, .product-card__delete-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 5px;
 }/*# sourceMappingURL=style.css.map */
