@@ -166,4 +166,29 @@ button, input {
 }
 .create-button:active {
   transform: scale(0.9);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  text-align: center;
+  padding: 20px;
+}
+.empty-state__icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+.empty-state__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+.empty-state__text {
+  font-size: 14px;
+  color: rgb(104.6774193548, 138.5, 172.3225806452);
+  max-width: 250px;
 }/*# sourceMappingURL=style.css.map */
