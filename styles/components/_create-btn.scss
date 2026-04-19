@@ -1,0 +1,28 @@
+@use "../abstracts/variables" as v;
+
+.create-button {
+  position: fixed;
+  bottom: 30px;
+  right: 20px;
+  
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: v.$primary-color;
+  color: v.$white-color;
+  
+  border: none;
+  font-size: 30px;
+  font-weight: 300;
+  cursor: pointer;
+  
+  box-shadow: 0 4px 10px rgba(v.$primary-color, 0.3);
+  
+  z-index: 900;
+  
+  transition: transform 0.2s;
+
+  &:active {
+    transform: scale(0.9);
+  }
+}

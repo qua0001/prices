@@ -48,7 +48,7 @@ button, input {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  display: flex;
+  display: none;
   flex-direction: column;
   justify-content: flex-end;
 }
@@ -145,4 +145,25 @@ button, input {
 .add-form__toggle-btn:hover, .add-form__toggle-btn:active {
   text-decoration: underline;
   opacity: 0.8;
+}
+
+.create-button {
+  position: fixed;
+  bottom: 30px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #27ae60;
+  color: #fff;
+  border: none;
+  font-size: 30px;
+  font-weight: 300;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
+  z-index: 900;
+  transition: transform 0.2s;
+}
+.create-button:active {
+  transform: scale(0.9);
 }/*# sourceMappingURL=style.css.map */
