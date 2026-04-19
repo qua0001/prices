@@ -129,4 +129,20 @@ button, input {
 .add-form__btn-cancel {
   background-color: #f1f3f5;
   color: #2c3e50;
+}
+.add-form__toggle-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 8px;
+  color: #27ae60;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.add-form__toggle-btn:hover, .add-form__toggle-btn:active {
+  text-decoration: underline;
+  opacity: 0.8;
 }/*# sourceMappingURL=style.css.map */
