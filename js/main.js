@@ -60,4 +60,4 @@ addForm.addEventListener('touchend', () => {
     formContent.style.transition = 'transform 0.3s ease-out';
     formContent.style.transform = 'translateY(0)';
   }
-});
+})
