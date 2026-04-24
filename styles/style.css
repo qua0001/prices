@@ -44,6 +44,17 @@ button, input {
   box-shadow: rgba(0, 0, 0, 0.05);
 }
 
+.u-no-select, .empty-state, .create-button, .add-form__content {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+       user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
 .add-form {
   position: fixed;
   inset: 0;
@@ -58,6 +69,11 @@ button, input {
   background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   z-index: -1;
+}
+.add-form__content input, .add-form__content textarea {
+  -moz-user-select: text;
+       user-select: text;
+  -webkit-user-select: text;
 }
 .add-form__content {
   background-color: #fff;
@@ -145,6 +161,10 @@ button, input {
 .add-form__toggle-btn:hover, .add-form__toggle-btn:active {
   text-decoration: underline;
   opacity: 0.8;
+}
+.add-form__hidden-input {
+  display: none;
+  margin-top: 10px;
 }
 
 .create-button {

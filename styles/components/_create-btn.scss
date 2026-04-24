@@ -1,4 +1,5 @@
 @use "../abstracts/variables" as v;
+@use "../base/helpers";
 
 .create-button {
   position: fixed;
@@ -25,4 +26,6 @@
   &:active {
     transform: scale(0.9);
   }
+
+  @extend .u-no-select;
 }
