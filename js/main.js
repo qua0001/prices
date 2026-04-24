@@ -10,7 +10,19 @@ const openForm = () => {
 const closeForm = () => {
   addForm.style.display = 'none';
   document.body.style.overflow = 'auto';
-}
+
+  const form = addForm.querySelector('form');
+  if (form) form.reset();
+
+  inputField.classList.add('is-hidden');
+  inputField.style.display = 'none';
+  inputField.disabled = true;
+
+  selectField.classList.remove('is-hidden');
+  selectField.disabled = false;
+
+  toggleBtn.textContent = '+ Добавить новую категорию';
+};
 
 createBtn.addEventListener('click', openForm);
 cancelBtn.addEventListener('click', closeForm);
