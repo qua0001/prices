@@ -1,6 +1,8 @@
 @use "../abstracts/variables" as v;
+@use "../base/helpers";
 
 .empty-state {
+  @extend .u-no-select;
   display: flex;
   flex-direction: column;
   align-items: center;

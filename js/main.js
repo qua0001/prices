@@ -61,3 +61,33 @@ addForm.addEventListener('touchend', () => {
     formContent.style.transform = 'translateY(0)';
   }
 })
+
+const toggleBtn = document.querySelector('.add-form__toggle-btn');
+const selectField = document.querySelector('#product-category');
+const inputField = document.querySelector('#add-category');
+
+toggleBtn.addEventListener('click', () => {
+  const isAddingNew = inputField.classList.contains('is-hidden') || 
+                      window.getComputedStyle(inputField).display === 'none';
+
+  if (isAddingNew) {
+    selectField.classList.add('is-hidden');
+    selectField.disabled = true;
+    
+    inputField.classList.remove('is-hidden');
+    inputField.style.display = 'block';
+    inputField.disabled = false;
+    inputField.focus();
+    
+    toggleBtn.textContent = '← Выбрать из списка';
+  } else {
+    inputField.classList.add('is-hidden');
+    inputField.style.display = 'none';
+    inputField.disabled = true;
+    
+    selectField.classList.remove('is-hidden');
+    selectField.disabled = false;
+    
+    toggleBtn.textContent = '+ Добавить новую категорию';
+  }
+});
