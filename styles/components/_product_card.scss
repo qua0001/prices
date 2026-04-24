@@ -4,47 +4,46 @@
   display: flex;
   align-items: center;
   background-color: v.$white-color;
-  padding: 12px;
-  border-radius: 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-
-  &__image {
-    width: 60px;
-    height: 60px;
-    background-color: #f0f0f0;
-    border-radius: 12px;
-    margin-right: 12px;
-    object-fit: cover;
-  }
+  padding: 6px 12px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  box-shadow: none;
+  border-bottom: 1px solid #f0f0f0; 
 
   &__info {
     flex-grow: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 
   &__name {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 500;
     color: v.$text-color;
-    margin-bottom: 4px;
   }
 
   &__price {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
     color: v.$primary-color;
+    margin-left: auto;
+    padding-right: 8px;
   }
 
-  &__actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  &__edit-btn, &__delete-btn {
+  &__menu-btn {
     background: none;
     border: none;
     font-size: 18px;
+    color: #b0b0b0;
     cursor: pointer;
-    padding: 5px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    &:active {
+      color: v.$primary-color;
+    }
   }
 }

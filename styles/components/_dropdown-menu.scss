@@ -1,0 +1,27 @@
+.product-menu {
+  position: absolute;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  z-index: 100;
+  min-width: 150px;
+  overflow: hidden;
+  display: none;
+
+  &.is-active {
+    display: block;
+  }
+
+  &__item {
+    padding: 12px 16px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover { background: #f9f9f9; }
+    &--delete { color: #eb4d4b; }
+  }
+}

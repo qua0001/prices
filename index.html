@@ -18,7 +18,8 @@
       <h2 class="empty-state__title">Здесь пока пусто</h2>
       <p class="empty-state__text">Нажмите на кнопку «+», чтобы добавить свой первый товар</p>
     </div>
-    <div class="categories">.</div>
+    <div class="product-list">
+  </div>
     <!-- Кнопка для создания новой категории/товара (появление предварительно созданной формы) -->
     <button class="create-button">+</button>
   </main>
@@ -47,6 +48,7 @@
           <label for="product-price">Стоимость товара:</label>
           <input
            type="number"
+           name="product-price"
            min="0"
            inputmode="decimal"
            id="product-price"
@@ -64,7 +66,7 @@
 
           <input
            type="text"
-           name="add-category"
+           name="custom-category"
            id="add-category"
            placeholder="Введите название..."
            class="add-form__hidden-input"

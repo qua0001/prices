@@ -2,11 +2,21 @@ const createBtn = document.querySelector('.create-button');
 const addForm = document.querySelector('.add-form');
 const cancelBtn = document.querySelector('.add-form__btn-cancel');
 const overlay = document.querySelector('.add-form__overlay');
+const toggleBtn = document.querySelector('.add-form__toggle-btn');
+const inputField = document.querySelector('#add-category');
+const selectField = document.querySelector('#product-category');
+const addFormElement = document.querySelector('.add-form form');
+const productList = document.querySelector('.product-list');
+const emptyState = document.querySelector('.empty-state');
+const formContent = document.querySelector('.add-form__content');
 
+// 1. Управление формой
 const openForm = () => {
   addForm.style.display = 'flex';
   document.body.style.overflow = 'hidden';
-}
+  formContent.style.transform = 'translateY(0)';
+};
+
 const closeForm = () => {
   addForm.style.display = 'none';
   document.body.style.overflow = 'auto';
@@ -17,10 +27,8 @@ const closeForm = () => {
   inputField.classList.add('is-hidden');
   inputField.style.display = 'none';
   inputField.disabled = true;
-
   selectField.classList.remove('is-hidden');
   selectField.disabled = false;
-
   toggleBtn.textContent = '+ Добавить новую категорию';
 };
 
@@ -28,78 +36,109 @@ createBtn.addEventListener('click', openForm);
 cancelBtn.addEventListener('click', closeForm);
 overlay.addEventListener('click', closeForm);
 
-const formContent = document.querySelector('.add-form__content');
-
-let startY = 0;
-let currentY = 0;
-let isDragging = false;
-
-const smoothClose = () => {
-  formContent.style.transition = 'transform 0.3s ease-out';
-  formContent.style.transform = 'translateY(100%)';
-  
-  setTimeout(() => {
-    closeForm();
-    formContent.style.transform = 'translateY(0)';
-  }, 300);
-};
-
-addForm.addEventListener('touchstart', (e) => {
-  startY = e.touches[0].clientY;
-  isDragging = true;
-  formContent.style.transition = 'none';
-});
-
-addForm.addEventListener('touchmove', (e) => {
-  if (!isDragging) return;
-  currentY = e.touches[0].clientY;
-  const deltaY = currentY - startY;
-
-  if (deltaY > 0) {
-    formContent.style.transform = `translateY(${deltaY}px)`;
-  }
-});
-
-addForm.addEventListener('touchend', () => {
-  if (!isDragging) return;
-  isDragging = false;
-
-  const deltaY = currentY - startY;
-
-  if (deltaY > 100) {
-    smoothClose();
-  } else {
-    formContent.style.transition = 'transform 0.3s ease-out';
-    formContent.style.transform = 'translateY(0)';
-  }
-})
-
-const toggleBtn = document.querySelector('.add-form__toggle-btn');
-const selectField = document.querySelector('#product-category');
-const inputField = document.querySelector('#add-category');
-
+// 2. Переключение категорий
 toggleBtn.addEventListener('click', () => {
-  const isAddingNew = inputField.classList.contains('is-hidden') || 
-                      window.getComputedStyle(inputField).display === 'none';
+  const isHidden = inputField.classList.contains('is-hidden');
 
-  if (isAddingNew) {
-    selectField.classList.add('is-hidden');
-    selectField.disabled = true;
-    
+  if (isHidden) {
     inputField.classList.remove('is-hidden');
     inputField.style.display = 'block';
     inputField.disabled = false;
     inputField.focus();
-    
-    toggleBtn.textContent = '← Выбрать из списка';
+    selectField.classList.add('is-hidden');
+    selectField.disabled = true;
+    toggleBtn.textContent = 'Назад к выбору';
   } else {
     inputField.classList.add('is-hidden');
     inputField.style.display = 'none';
     inputField.disabled = true;
-    
     selectField.classList.remove('is-hidden');
     selectField.disabled = false;
-    
     toggleBtn.textContent = '+ Добавить новую категорию';
+  }
+});
+
+// 3. Отрисовка товара
+const renderProduct = (product) => {
+  if (emptyState) emptyState.style.display = 'none';
+
+  // Ищем секцию категории
+  let categorySection = document.querySelector(`.category-section[data-category="${product.category}"]`);
+
+  // Если секции нет — создаем её
+  if (!categorySection) {
+    const sectionHtml = `
+      <section class="category-section" data-category="${product.category}">
+        <h2 class="category-section__title">${product.category}</h2>
+        <div class="category-section__list"></div>
+      </section>
+    `;
+    productList.insertAdjacentHTML('beforeend', sectionHtml);
+    categorySection = document.querySelector(`.category-section[data-category="${product.category}"]`);
+  }
+
+  // Шаблон карточки (используем __name и __menu-btn для соответствия твоим SCSS)
+  const productHtml = `
+    <div class="product-card" data-id="${product.id}">
+      <div class="product-card__info">
+        <h3 class="product-card__name">${product.title}</h3>
+      </div>
+      <div class="product-card__price">${product.price} ₽</div>
+      <button class="product-card__menu-btn">⋮</button>
+    </div>
+  `;
+
+  const listContainer = categorySection.querySelector('.category-section__list');
+  listContainer.insertAdjacentHTML('afterbegin', productHtml);
+};
+
+// 4. Обработка отправки формы
+addFormElement.addEventListener('submit', (event) => {
+  event.preventDefault();
+
+  const formData = new FormData(addFormElement);
+  
+  const customCat = formData.get('custom-category');
+  const selectedCat = formData.get('product-category');
+  const category = (customCat && customCat.trim() !== "") ? customCat : selectedCat;
+
+  const product = {
+    id: Date.now(),
+    title: formData.get('product-name'),
+    price: formData.get('product-price'),
+    category: category || 'Без категории',
+    isBought: false
+  };
+
+  renderProduct(product);
+  closeForm(); // Теперь вызывается один раз после отрисовки
+});
+
+// 5. Логика выпадающего меню (три точки)
+document.addEventListener('click', (e) => {
+  const menuBtn = e.target.closest('.product-card__menu-btn');
+  
+  // Закрываем другие открытые меню
+  document.querySelectorAll('.product-menu').forEach(m => m.remove());
+
+  if (menuBtn) {
+    const card = menuBtn.closest('.product-card');
+    const productId = card.dataset.id;
+
+    const menuHtml = `
+      <div class="product-menu is-active">
+        <div class="product-menu__item">✎ Редактировать</div>
+        <div class="product-menu__item">⇄ Перенести</div>
+        <div class="product-menu__item product-menu__item--delete">🗑 Удалить</div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', menuHtml);
+    const menu = document.querySelector('.product-menu');
+    
+    const rect = menuBtn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 5}px`;
+    menu.style.left = `${rect.left - 120}px`;
   }
 });

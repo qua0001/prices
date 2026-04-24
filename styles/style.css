@@ -217,42 +217,87 @@ button, input {
   display: flex;
   align-items: center;
   background-color: #fff;
-  padding: 12px;
-  border-radius: 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-.product-card__image {
-  width: 60px;
-  height: 60px;
-  background-color: #f0f0f0;
-  border-radius: 12px;
-  margin-right: 12px;
-  -o-object-fit: cover;
-     object-fit: cover;
+  padding: 6px 12px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  box-shadow: none;
+  border-bottom: 1px solid #f0f0f0;
 }
 .product-card__info {
   flex-grow: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .product-card__name {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 500;
   color: #2c3e50;
-  margin-bottom: 4px;
 }
 .product-card__price {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: #27ae60;
+  margin-left: auto;
+  padding-right: 8px;
 }
-.product-card__actions {
-  display: flex;
-  gap: 8px;
-}
-.product-card__edit-btn, .product-card__delete-btn {
+.product-card__menu-btn {
   background: none;
   border: none;
   font-size: 18px;
+  color: #b0b0b0;
   cursor: pointer;
-  padding: 5px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.product-card__menu-btn:active {
+  color: #27ae60;
+}
+
+.category-section {
+  margin-bottom: 24px;
+}
+.category-section__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 12px;
+  padding-left: 4px;
+  text-transform: capitalize;
+}
+.category-section__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-menu {
+  position: absolute;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  min-width: 150px;
+  overflow: hidden;
+  display: none;
+}
+.product-menu.is-active {
+  display: block;
+}
+.product-menu__item {
+  padding: 12px 16px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.product-menu__item:hover {
+  background: #f9f9f9;
+}
+.product-menu__item--delete {
+  color: #eb4d4b;
 }/*# sourceMappingURL=style.css.map */
