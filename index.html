@@ -19,7 +19,7 @@
       <p class="empty-state__text">Нажмите на кнопку «+», чтобы добавить свой первый товар</p>
     </div>
     <div class="product-list">
-  </div>
+    </div>
     <!-- Кнопка для создания новой категории/товара (появление предварительно созданной формы) -->
     <button class="create-button">+</button>
   </main>
@@ -27,7 +27,7 @@
   <!-- Форма добавления новой категории/товара -->
   <div class="add-form">
     <!-- Затемнение основного контента, когда форма открыта -->
-    <div class="add-form__overlay"></div> 
+    <div class="add-form__overlay"></div>
     <!-- Форма -->
     <div class="add-form__content">
       <div class="add-form__title">Новый товар</div>
@@ -35,44 +35,38 @@
       <form action="">
         <div class="add-form__field">
           <label for="product-name">Название товара:</label>
-          <input
-           type="text"
-           name="product-name"
-           id="product-name"
-           placeholder="Введите название..."
-           autocomplete="off"
-           spellcheck="false"
-          >
+          <input type="text" name="product-name" id="product-name" placeholder="Введите название..." autocomplete="off"
+            spellcheck="false">
         </div>
         <div class="add-form__field">
           <label for="product-price">Стоимость товара:</label>
-          <input
-           type="number"
-           name="product-price"
-           min="0"
-           inputmode="decimal"
-           id="product-price"
-           placeholder="Введите стоимость..."
-           spellcheck="false"
-          >
+          <input type="number" name="product-price" min="0" inputmode="decimal" id="product-price"
+            placeholder="Введите стоимость..." spellcheck="false">
         </div>
         <div class="add-form__field">
           <label for="product-category">Категория товара:</label>
           <select name="product-category" id="product-category" required>
             <option value="" disabled selected>Выберите категорию...</option>
-            <option value="vegetables">Овощи</option>
-            <option value="fruits">Фрукты</option>
+            <option value="Овощи">Овощи</option>
+            <option value="Фрукты">Фрукты</option>
           </select>
 
-          <input
-           type="text"
-           name="custom-category"
-           id="add-category"
-           placeholder="Введите название..."
-           class="add-form__hidden-input"
-           autocapitalize="words"
-           spellcheck="false"
-          >
+          <div class="add-form__field">
+            <div class="add-form__label">Тип цены</div>
+            <div class="price-unit">
+              <label class="price-unit__item">
+                <input type="radio" name="price-unit" value="шт." checked>
+                <span>шт.</span>
+              </label>
+              <label class="price-unit__item">
+                <input type="radio" name="price-unit" value="кг">
+                <span>кг</span>
+              </label>
+            </div>
+          </div>
+
+          <input type="text" name="custom-category" id="add-category" placeholder="Введите название..."
+            class="add-form__hidden-input" autocapitalize="words" spellcheck="false">
 
           <button type="button" class="add-form__toggle-btn">+ Добавить новую категорию</button>
         </div>

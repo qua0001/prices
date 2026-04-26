@@ -46,4 +46,11 @@
       color: v.$primary-color;
     }
   }
+
+  &__unit {
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
+    margin-left: 2px;
+  }
 }

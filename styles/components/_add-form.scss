@@ -113,7 +113,7 @@
     padding: 0;
     margin-top: 8px;
     
-    color: v.$primary-color; // Используем твой акцентный зеленый
+    color: v.$primary-color;
     font-size: 14px;
     font-weight: 600;
     text-align: left;
@@ -122,7 +122,7 @@
     transition: opacity 0.2s;
 
     &:hover, &:active {
-      text-decoration: underline; // Подчеркивание при наведении добавит интерактивности
+      text-decoration: underline;
       opacity: 0.8;
     }
   }
@@ -130,5 +130,36 @@
   &__hidden-input {
     display: none; 
     margin-top: 10px;
+  }
+
+  .price-unit {
+    display: flex;
+    gap: 15px;
+    margin-top: 4px;
+
+    &__item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      color: v.$text-color;
+      cursor: pointer;
+
+      input[type="radio"] {
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        cursor: pointer;
+        
+        outline: none; 
+        
+        -webkit-tap-highlight-color: transparent; 
+
+        &:focus {
+          border-color: transparent;
+          box-shadow: none;
+        }
+      }
+    }
   }
 }
