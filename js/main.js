@@ -13,15 +13,12 @@ const formContent = document.querySelector(".add-form__content");
 const openForm = () => {
   addForm.style.display = "flex";
   document.body.style.overflow = "hidden";
-  formContent.style.transform = "translateY(0)";
 };
 
 const closeForm = () => {
   addForm.style.display = "none";
   document.body.style.overflow = "auto";
-
-  const form = addForm.querySelector("form");
-  if (form) form.reset();
+  if (addFormElement) addFormElement.reset();
 
   inputField.classList.add("is-hidden");
   inputField.style.display = "none";
@@ -37,7 +34,6 @@ overlay.addEventListener("click", closeForm);
 
 toggleBtn.addEventListener("click", () => {
   const isHidden = inputField.classList.contains("is-hidden");
-
   if (isHidden) {
     inputField.classList.remove("is-hidden");
     inputField.style.display = "block";
@@ -81,7 +77,9 @@ const renderProduct = (product) => {
       <div class="product-card__info">
         <h3 class="product-card__name">${product.title}</h3>
       </div>
-      <div class="product-card__price">${product.price} ₽ <span style="font-size: 12px; color: #888; font-weight: normal;">/ ${product.priceType}</span></div>
+      <div class="product-card__price">
+        ${product.price} ₽ <span class="product-card__unit">/ ${product.priceUnit}</span>
+      </div>
       <button class="product-card__menu-btn">⋮</button>
     </div>
   `;
@@ -94,7 +92,6 @@ const renderProduct = (product) => {
 
 addFormElement.addEventListener("submit", (event) => {
   event.preventDefault();
-
   const formData = new FormData(addFormElement);
 
   const customCat = formData.get("custom-category");
@@ -106,7 +103,7 @@ addFormElement.addEventListener("submit", (event) => {
     id: Date.now(),
     title: formData.get("product-name"),
     price: formData.get("product-price"),
-    priceType: formData.get("price-type"),
+    priceUnit: formData.get("price-unit"),
     category: category || "Без категории",
     isBought: false,
   };
@@ -117,15 +114,23 @@ addFormElement.addEventListener("submit", (event) => {
 
 document.addEventListener("click", (e) => {
   const menuBtn = e.target.closest(".product-card__menu-btn");
+  const existingMenu = document.querySelector(".product-menu");
 
-  document.querySelectorAll(".product-menu").forEach((m) => m.remove());
+  if (existingMenu) {
+    const isSameBtn =
+      menuBtn &&
+      menuBtn.closest(".product-card").dataset.id === existingMenu.dataset.for;
+    existingMenu.remove();
+
+    if (isSameBtn) return;
+  }
 
   if (menuBtn) {
     const card = menuBtn.closest(".product-card");
     const productId = card.dataset.id;
 
     const menuHtml = `
-      <div class="product-menu is-active">
+      <div class="product-menu is-active" data-for="${productId}">
         <div class="product-menu__item">✎ Редактировать</div>
         <div class="product-menu__item">⇄ Перенести</div>
         <div class="product-menu__item product-menu__item--delete">🗑 Удалить</div>

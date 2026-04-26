@@ -44,31 +44,31 @@
             placeholder="Введите стоимость..." spellcheck="false">
         </div>
         <div class="add-form__field">
-          <label for="product-category">Категория товара:</label>
+          <div class="add-form__label">Категория товара</div>
           <select name="product-category" id="product-category" required>
             <option value="" disabled selected>Выберите категорию...</option>
             <option value="Овощи">Овощи</option>
             <option value="Фрукты">Фрукты</option>
           </select>
 
-          <div class="add-form__field">
-            <div class="add-form__label">Тип цены</div>
-            <div class="price-unit">
-              <label class="price-unit__item">
-                <input type="radio" name="price-unit" value="шт." checked>
-                <span>шт.</span>
-              </label>
-              <label class="price-unit__item">
-                <input type="radio" name="price-unit" value="кг">
-                <span>кг</span>
-              </label>
-            </div>
-          </div>
-
           <input type="text" name="custom-category" id="add-category" placeholder="Введите название..."
-            class="add-form__hidden-input" autocapitalize="words" spellcheck="false">
+            class="add-form__hidden-input is-hidden" style="display: none;" disabled>
 
           <button type="button" class="add-form__toggle-btn">+ Добавить новую категорию</button>
+        </div>
+
+        <div class="add-form__field">
+          <div class="add-form__label">Тип цены</div>
+          <div class="price-unit">
+            <label class="price-unit__item">
+              <input type="radio" name="price-unit" value="шт." checked>
+              <span>шт.</span>
+            </label>
+            <label class="price-unit__item">
+              <input type="radio" name="price-unit" value="кг">
+              <span>кг</span>
+            </label>
+          </div>
         </div>
         <div class="add-form__field">
           <label for="product-image">Фото товара (необязательно):</label>
