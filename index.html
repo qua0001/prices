@@ -82,6 +82,25 @@
     </div>
   </div>
 
+  <datalist id="existing-categories"></datalist>
+
+  <div class="transfer-modal" id="transfer-modal" style="display: none;">
+    <div class="add-form__overlay" onclick="closeTransferModal()"></div>
+    <div class="add-form__content">
+      <div class="add-form__title">Перенос товара</div>
+      <div class="add-form__field">
+        <label>Выберите или введите новую категорию:</label>
+        <input type="text" id="transfer-category-input" list="existing-categories" placeholder="Начните писать..."
+          autocomplete="off">
+        <p id="transfer-suggestion" style="font-size: 12px; color: #666; margin-top: 5px;"></p>
+      </div>
+      <div class="add-form__actions">
+        <button type="button" class="add-form__btn add-form__btn-submit" onclick="confirmTransfer()">Перенести</button>
+        <button type="button" class="add-form__btn add-form__btn-cancel" onclick="closeTransferModal()">Отмена</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');

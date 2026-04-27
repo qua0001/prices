@@ -184,6 +184,12 @@ button, input {
   height: 18px;
   margin: 0;
   cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.add-form .price-unit__item input[type=radio]:focus {
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .create-button {
@@ -297,6 +303,14 @@ button, input {
   flex-direction: column;
   gap: 8px;
 }
+.category-section__menu-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #b0b0b0;
+  cursor: pointer;
+  padding: 10px;
+}
 
 .product-menu {
   position: absolute;
@@ -325,4 +339,16 @@ button, input {
 }
 .product-menu__item--delete {
   color: #eb4d4b;
+}
+
+.transfer-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.transfer-modal .add-form__content {
+  transform: translateY(0);
 }/*# sourceMappingURL=style.css.map */
