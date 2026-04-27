@@ -12,6 +12,41 @@ const formContent = document.querySelector(".add-form__content");
 
 let editingProductId = null;
 
+const productsHistory = {};
+
+window.addToHistory = (id, message) => {
+  if (!productsHistory[id]) productsHistory[id] = [];
+  const now = new Date().toLocaleString();
+  productsHistory[id].unshift({ date: now, msg: message });
+};
+
+window.showHistory = (id) => {
+  const content = document.querySelector("#history-content");
+  const history = productsHistory[id] || [];
+
+  if (history.length === 0) {
+    content.innerHTML = "<p>Истории изменений пока нет</p>";
+  } else {
+    content.innerHTML = history
+      .map(
+        (item) => `
+      <div class="history-item">
+        <span>${item.date}</span>
+        ${item.msg}
+      </div>
+    `,
+      )
+      .join("");
+  }
+
+  document.querySelector("#history-modal").style.display = "flex";
+  document.querySelector(".product-menu")?.remove();
+};
+
+window.closeHistory = () => {
+  document.querySelector("#history-modal").style.display = "none";
+};
+
 const openForm = () => {
   addForm.style.display = "flex";
   document.body.style.overflow = "hidden";
@@ -34,7 +69,7 @@ const closeForm = () => {
   toggleBtn.textContent = "+ Добавить новую категорию";
 
   selectField.disabled = false;
-  toggleBtn.style.display = 'block';
+  toggleBtn.style.display = "block";
 };
 
 createBtn.addEventListener("click", openForm);
@@ -119,6 +154,26 @@ addFormElement.addEventListener("submit", (event) => {
     category: category || "Без категории",
   };
 
+  const isDuplicate = Array.from(
+    document.querySelectorAll(".product-card"),
+  ).some((card) => {
+    const name = card
+      .querySelector(".product-card__name")
+      .textContent.trim()
+      .toLowerCase();
+
+    const id = card.dataset.id;
+    return (
+      name === productData.title.trim().toLowerCase() &&
+      id !== String(editingProductId)
+    );
+  });
+
+  if (isDuplicate) {
+    alert("Товар с таким именем уже существует!");
+    return;
+  }
+
   if (editingProductId) {
     const oldCard = document.querySelector(
       `.product-card[data-id="${editingProductId}"]`,
@@ -162,8 +217,8 @@ document.addEventListener("click", (e) => {
 
     const menuHtml = `
       <div class="product-menu is-active" data-for="${productId}">
-        <div class="product-menu__item" onclick="editProduct('${productId}')">✎ Редактировать</div>
-        <div class="product-menu__item" onclick="moveProduct('${productId}')">⇄ Перенести</div>
+        <div class="product-menu__item" onclick="editProduct('${productId}')">✎ Изменить</div>
+        <div class="product-menu__item" onclick="moveProduct('${productId}')">⇄ Переместить</div>
         <div class="product-menu__item product-menu__item--delete" onclick="deleteProduct('${productId}')">🗑 Удалить</div>
       </div>
     `;
@@ -289,28 +344,35 @@ window.confirmTransfer = () => {
     (cat) => cat.toLowerCase() === newCat.toLowerCase(),
   );
 
-  if (!exactMatch && !suggestion) {
-    if (!confirm(`Категории "${newCat}" не существует. Создать новую?`)) return;
-  }
-
-  if (exactMatch) {
-    newCat = exactMatch;
-  } else {
+  if (!exactMatch) {
     const suggestion = categoryNames.find((cat) =>
       cat.toLowerCase().includes(newCat.toLowerCase()),
     );
 
     if (suggestion) {
       if (
-        !confirm(
-          `Категория "${newCat}" не найдена. Возможно, вы имели в виду "${suggestion}"?`,
+        confirm(
+          `Категории "${newCat}" не существует. Использовать похожу disguised как "${suggestion}"?`,
         )
       ) {
-      } else {
         newCat = suggestion;
+      } else {
+        if (!confirm(`Создать новую категорию "${newCat}"?`)) return;
       }
+    } else {
+      if (!confirm(`Категории "${newCat}" не существует. Создать новую?`))
+        return;
     }
+  } else {
+    newCat = exactMatch;
   }
+
+  if (
+    !confirm(
+      `Вы уверены, что хотите переместить товар в категорию "${newCat}"?`,
+    )
+  )
+    return;
 
   const card = document.querySelector(
     `.product-card[data-id="${productToMove}"]`,
@@ -322,7 +384,8 @@ window.confirmTransfer = () => {
     .querySelector(".product-card__unit")
     .textContent.replace("/ ", "");
 
-  deleteProduct(productToMove);
+  deleteProductForMove(productToMove);
+
   renderProduct({
     id: productToMove,
     title: name,
@@ -331,7 +394,16 @@ window.confirmTransfer = () => {
     category: newCat,
   });
 
+  if (window.addToHistory) {
+    addToHistory(productToMove, `Товар перемещен в категорию: ${newCat}`);
+  }
+
   closeTransferModal();
+};
+
+window.deleteProductForMove = (id) => {
+  const card = document.querySelector(`.product-card[data-id="${id}"]`);
+  if (card) card.remove();
 };
 
 window.deleteCategory = (categoryName) => {
@@ -392,7 +464,7 @@ window.openCategoryMenu = (e, categoryName) => {
 
   const menuHtml = `
     <div class="product-menu is-active" data-for="${categoryName}">
-      <div class="product-menu__item" onclick="addProductToCategory('${categoryName}')">➕ Добавить товар сюда</div>
+      <div class="product-menu__item" onclick="addProductToCategory('${categoryName}')">➕ Добавить товар</div>
       <div class="product-menu__item" onclick="editCategoryName('${categoryName}')">✎ Переименовать</div>
       <div class="product-menu__item" onclick="moveCategory('${categoryName}', 'up')">↑ Выше</div>
       <div class="product-menu__item" onclick="moveCategory('${categoryName}', 'down')">↓ Ниже</div>

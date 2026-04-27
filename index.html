@@ -95,8 +95,20 @@
         <p id="transfer-suggestion" style="font-size: 12px; color: #666; margin-top: 5px;"></p>
       </div>
       <div class="add-form__actions">
-        <button type="button" class="add-form__btn add-form__btn-submit" onclick="confirmTransfer()">Перенести</button>
+        <button type="button" class="add-form__btn add-form__btn-submit"
+          onclick="confirmTransfer()">Переместить</button>
         <button type="button" class="add-form__btn add-form__btn-cancel" onclick="closeTransferModal()">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="history-modal" id="history-modal" style="display: none;">
+    <div class="history-modal__container">
+      <div class="history-modal__header">
+        <h3>История изменений</h3>
+        <button onclick="closeHistory()">✕</button>
+      </div>
+      <div class="history-modal__content" id="history-content">
       </div>
     </div>
   </div>

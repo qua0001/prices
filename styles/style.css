@@ -351,4 +351,46 @@ button, input {
 }
 .transfer-modal .add-form__content {
   transform: translateY(0);
+}
+
+.history-modal {
+  position: fixed;
+  inset: 0;
+  background: white;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+}
+.history-modal__header {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+}
+.history-modal__header h3 {
+  margin: 0;
+}
+.history-modal__header button {
+  background: none;
+  border: none;
+  font-size: 20px;
+}
+.history-modal__content {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-modal .history-item {
+  padding: 10px;
+  border-left: 3px solid var(--primary-color, #4834d4);
+  background: #f9f9f9;
+  font-size: 14px;
+}
+.history-modal .history-item span {
+  color: #888;
+  font-size: 12px;
+  display: block;
 }/*# sourceMappingURL=style.css.map */
