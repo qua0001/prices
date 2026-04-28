@@ -9,8 +9,17 @@ const addFormElement = document.querySelector(".add-form form");
 const productList = document.querySelector(".product-list");
 const emptyState = document.querySelector(".empty-state");
 const formContent = document.querySelector(".add-form__content");
+const imageInput = document.querySelector("#product-image");
+const lightbox = document.querySelector("#image-lightbox");
+const lightboxImg = lightbox.querySelector(".lightbox__img");
 
 let editingProductId = null;
+
+const formatString = (str) => {
+  if (!str) return "";
+  const trimmed = str.trim();
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
 
 const productsHistory = {};
 
@@ -126,53 +135,97 @@ const renderProduct = (product) => {
     ".category-section__list",
   );
 
+  const imageHtml = product.image
+    ? `<div class="product-card__img"><img src="${product.image}" alt="${product.title}"></div>`
+    : `<div class="product-card__img product-card__img--empty">📦</div>`;
+
   const productHtml = `
     <div class="product-card" data-id="${product.id}">
+      ${imageHtml}
       <div class="product-card__info">
         <h3 class="product-card__name">${product.title}</h3>
+        <div class="product-card__price">${product.price} ₽ <span class="product-card__unit">/ ${product.priceUnit}</span></div>
       </div>
-      <div class="product-card__price">${product.price} ₽ <span class="product-card__unit">/ ${product.priceUnit}</span></div>
-      <button class="product-card__menu-btn">⋮</button>
+      <button class="product-card__menu-btn" onclick="openProductMenu(event, '${product.id}')">⋮</button>
     </div>
   `;
   listContainer.insertAdjacentHTML("afterbegin", productHtml);
 };
 
-addFormElement.addEventListener("submit", (event) => {
+addFormElement.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(addFormElement);
 
-  const customCat = formData.get("custom-category");
+  const rawTitle = formData.get("product-name");
+  const rawPrice = formData.get("product-price");
+  const rawCustomCat = formData.get("custom-category");
   const selectedCat = formData.get("product-category");
-  const category =
-    customCat && customCat.trim() !== "" ? customCat : selectedCat;
+  const isCustomActive = !inputField.classList.contains("is-hidden");
+
+  const title = formatString(rawTitle);
+  if (!title) {
+    alert("Название товара обязательно для заполнения");
+    return;
+  }
+
+  if (!rawPrice || isNaN(parseInt(rawPrice))) {
+    alert("Укажите корректную цену");
+    return;
+  }
+
+  if (rawPrice.length > 6) {
+    alert("Цена не может содержать более 6 цифр");
+    return;
+  }
+
+  let category = isCustomActive ? formatString(rawCustomCat) : selectedCat;
+
+  if (isCustomActive && !category) {
+    alert("Введите название новой категории");
+    return;
+  }
+
+  if (!category) category = "Без категории";
 
   const productData = {
-    title: formData.get("product-name"),
-    price: formData.get("product-price"),
+    title: title,
+    price: parseInt(rawPrice),
     priceUnit: formData.get("price-unit"),
-    category: category || "Без категории",
+    category: category,
   };
 
   const isDuplicate = Array.from(
     document.querySelectorAll(".product-card"),
   ).some((card) => {
-    const name = card
+    const cardName = card
       .querySelector(".product-card__name")
       .textContent.trim()
       .toLowerCase();
-
-    const id = card.dataset.id;
-    return (
-      name === productData.title.trim().toLowerCase() &&
-      id !== String(editingProductId)
-    );
+    const isSameName = cardName === productData.title.toLowerCase();
+    const isDifferentId = card.dataset.id !== String(editingProductId);
+    return isSameName && isDifferentId;
   });
 
   if (isDuplicate) {
     alert("Товар с таким именем уже существует!");
     return;
   }
+
+  const file = imageInput.files[0];
+  let imageData = null;
+  if (file) {
+    imageData = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
+  } else if (editingProductId) {
+    const oldCard = document.querySelector(
+      `.product-card[data-id="${editingProductId}"]`,
+    );
+    imageData = oldCard?.querySelector("img")?.src || null;
+  }
+  productData.image = imageData;
 
   if (editingProductId) {
     const oldCard = document.querySelector(
@@ -187,12 +240,31 @@ addFormElement.addEventListener("submit", (event) => {
         `${productData.price} ₽ `;
       oldCard.querySelector(".product-card__unit").textContent =
         `/ ${productData.priceUnit}`;
+
+      const imgCont = oldCard.querySelector(".product-card__img");
+      if (productData.image) {
+        imgCont.innerHTML = `<img src="${productData.image}" alt="${productData.title}">`;
+        imgCont.classList.remove("product-card__img--empty");
+      } else {
+        imgCont.innerHTML = "📦";
+        imgCont.classList.add("product-card__img--empty");
+      }
+
+      if (window.addToHistory)
+        addToHistory(editingProductId, "Данные обновлены через форму");
     } else {
       deleteProduct(editingProductId);
       renderProduct({ id: editingProductId, ...productData });
+      if (window.addToHistory)
+        addToHistory(
+          editingProductId,
+          `Категория изменена на "${productData.category}"`,
+        );
     }
   } else {
-    renderProduct({ id: Date.now(), ...productData });
+    const newId = Date.now();
+    renderProduct({ id: newId, ...productData });
+    if (window.addToHistory) addToHistory(newId, "Товар создан");
   }
 
   closeForm();
@@ -302,28 +374,42 @@ window.editProduct = (id) => {
 };
 
 window.moveProduct = (id) => {
-  productToMove = id;
   const card = document.querySelector(`.product-card[data-id="${id}"]`);
-  const currentCat = card.closest(".category-section").dataset.category;
+  const currentCategory = card.closest(".category-section").dataset.category;
 
-  const modal = document.querySelector("#transfer-modal");
-  const input = document.querySelector("#transfer-category-input");
-  const datalist = document.querySelector("#existing-categories");
+  let newCategory = prompt(
+    "Введите название новой категории:",
+    currentCategory,
+  );
 
-  const categories = Array.from(
-    document.querySelectorAll(".category-section"),
-  ).map((s) => s.dataset.category);
+  if (newCategory) {
+    newCategory = formatString(newCategory);
 
-  datalist.innerHTML = categories
-    .map((cat) => `<option value="${cat}">`)
-    .join("");
+    if (newCategory.length > 25) {
+      alert("Название категории слишком длинное (макс. 25 символов)");
+      return;
+    }
 
-  input.value = "";
-  input.placeholder = `Сейчас: ${currentCat}`;
-  modal.style.display = "flex";
-  input.focus();
+    if (newCategory !== currentCategory) {
+      const name = card.querySelector(".product-card__name").textContent;
+      const priceText = card.querySelector(".product-card__price").textContent;
+      const price = parseInt(priceText);
+      const priceUnit = card
+        .querySelector(".product-card__unit")
+        .textContent.replace("/ ", "");
+      const image = card.querySelector("img")?.src || null;
 
-  document.querySelector(".product-menu")?.remove();
+      deleteProduct(id);
+      renderProduct({
+        id: id,
+        title: name,
+        price: price,
+        priceUnit: priceUnit,
+        category: newCategory,
+        image: image,
+      });
+    }
+  }
 };
 
 window.closeTransferModal = () => {
@@ -501,3 +587,15 @@ window.addProductToCategory = (categoryName) => {
 
   document.querySelector(".product-menu")?.remove();
 };
+
+document.addEventListener("click", (e) => {
+  const productImg = e.target.closest(".product-card__img img");
+  if (productImg) {
+    lightboxImg.src = productImg.src;
+    lightbox.classList.add("is-active");
+  }
+});
+
+lightbox.addEventListener("click", () => {
+  lightbox.classList.remove("is-active");
+});

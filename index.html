@@ -35,12 +35,12 @@
       <form action="">
         <div class="add-form__field">
           <label for="product-name">Название товара:</label>
-          <input type="text" name="product-name" id="product-name" placeholder="Введите название..." autocomplete="off"
-            spellcheck="false">
+          <input type="text" name="product-name" id="product-name" required maxlength="40"
+            placeholder="Введите название..." autocomplete="off" spellcheck="false">
         </div>
         <div class="add-form__field">
           <label for="product-price">Стоимость товара:</label>
-          <input type="number" name="product-price" min="0" inputmode="decimal" id="product-price"
+          <input type="number" name="product-price" min="0" required inputmode="decimal" id="product-price"
             placeholder="Введите стоимость..." spellcheck="false">
         </div>
         <div class="add-form__field">
@@ -51,8 +51,8 @@
             <option value="Фрукты">Фрукты</option>
           </select>
 
-          <input type="text" name="custom-category" id="add-category" placeholder="Введите название..."
-            class="add-form__hidden-input is-hidden" style="display: none;" disabled>
+          <input type="text" name="custom-category" id="add-category" maxlength="25" required
+            placeholder="Введите название..." class="add-form__hidden-input is-hidden" style="display: none;" disabled>
 
           <button type="button" class="add-form__toggle-btn">+ Добавить новую категорию</button>
         </div>
@@ -111,6 +111,11 @@
       <div class="history-modal__content" id="history-content">
       </div>
     </div>
+  </div>
+
+  <div id="image-lightbox" class="lightbox">
+    <div class="lightbox__overlay"></div>
+    <img src="" alt="" class="lightbox__img">
   </div>
 
   <script>
