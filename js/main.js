@@ -14,6 +14,8 @@ const lightbox = document.querySelector("#image-lightbox");
 const lightboxImg = lightbox.querySelector(".lightbox__img");
 
 let editingProductId = null;
+let originalProductData = null;
+let lockedCategory = null;
 
 const formatString = (str) => {
   if (!str) return "";
@@ -63,6 +65,10 @@ const openForm = () => {
   document.querySelector(".add-form__title").textContent = "Новый товар";
   document.querySelector(".add-form__btn-submit").textContent = "Добавить";
   editingProductId = null;
+  
+  imageInput.value = "";
+  const existingImagePreview = document.querySelector(".add-form__image-preview");
+  if (existingImagePreview) existingImagePreview.remove();
 };
 
 const closeForm = () => {
@@ -79,6 +85,14 @@ const closeForm = () => {
 
   selectField.disabled = false;
   toggleBtn.style.display = "block";
+  
+  editingProductId = null;
+  originalProductData = null;
+  lockedCategory = null;
+  
+  imageInput.value = "";
+  const existingImagePreview = document.querySelector(".add-form__image-preview");
+  if (existingImagePreview) existingImagePreview.remove();
 };
 
 createBtn.addEventListener("click", openForm);
@@ -158,113 +172,74 @@ addFormElement.addEventListener("submit", async (event) => {
 
   const rawTitle = formData.get("product-name");
   const rawPrice = formData.get("product-price");
-  const rawCustomCat = formData.get("custom-category");
-  const selectedCat = formData.get("product-category");
   const isCustomActive = !inputField.classList.contains("is-hidden");
+  const selectIsDisabled = selectField.disabled;
 
   const title = formatString(rawTitle);
-  if (!title) {
-    alert("Название товара обязательно для заполнения");
-    return;
+  if (!title) return alert("Введите название");
+  if (rawPrice.length > 6) return alert("Максимум 6 цифр в цене");
+
+  let category;
+  if (selectIsDisabled && lockedCategory) {
+    category = lockedCategory;
+  } else if (isCustomActive) {
+    category = formatString(formData.get("custom-category"));
+  } else {
+    category = formatString(formData.get("product-category"));
   }
-
-  if (!rawPrice || isNaN(parseInt(rawPrice))) {
-    alert("Укажите корректную цену");
-    return;
-  }
-
-  if (rawPrice.length > 6) {
-    alert("Цена не может содержать более 6 цифр");
-    return;
-  }
-
-  let category = isCustomActive ? formatString(rawCustomCat) : selectedCat;
-
-  if (isCustomActive && !category) {
-    alert("Введите название новой категории");
-    return;
-  }
-
-  if (!category) category = "Без категории";
-
-  const productData = {
-    title: title,
-    price: parseInt(rawPrice),
-    priceUnit: formData.get("price-unit"),
-    category: category,
-  };
+  
+  if (!category || category === "Выберите категорию..." || category === "")
+    category = "Без категории";
 
   const isDuplicate = Array.from(
     document.querySelectorAll(".product-card"),
   ).some((card) => {
-    const cardName = card
-      .querySelector(".product-card__name")
-      .textContent.trim()
-      .toLowerCase();
-    const isSameName = cardName === productData.title.toLowerCase();
-    const isDifferentId = card.dataset.id !== String(editingProductId);
-    return isSameName && isDifferentId;
+    return (
+      card.querySelector(".product-card__name").textContent.toLowerCase() ===
+        title.toLowerCase() && card.dataset.id !== String(editingProductId)
+    );
   });
 
-  if (isDuplicate) {
-    alert("Товар с таким именем уже существует!");
-    return;
-  }
+  if (isDuplicate) return alert("Такой товар уже есть!");
 
-  const file = imageInput.files[0];
+  if (title.length > 40) return alert("Название не может быть длиннее 40 символов");
+  if (!isCustomActive && category.length > 25) return alert("Категория не может быть длиннее 25 символов");
+
   let imageData = null;
+  const file = imageInput.files[0];
   if (file) {
-    imageData = await new Promise((resolve) => {
+    imageData = await new Promise((r) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
+      reader.onload = () => r(reader.result);
       reader.readAsDataURL(file);
     });
   } else if (editingProductId) {
-    const oldCard = document.querySelector(
-      `.product-card[data-id="${editingProductId}"]`,
-    );
-    imageData = oldCard?.querySelector("img")?.src || null;
+    imageData =
+      document.querySelector(`.product-card[data-id="${editingProductId}"] img`)
+        ?.src || null;
   }
-  productData.image = imageData;
+
+  const productData = {
+    title,
+    price: parseInt(rawPrice),
+    priceUnit: formData.get("price-unit"),
+    category,
+    image: imageData,
+  };
 
   if (editingProductId) {
-    const oldCard = document.querySelector(
-      `.product-card[data-id="${editingProductId}"]`,
-    );
-    const oldCategory = oldCard.closest(".category-section").dataset.category;
-
-    if (oldCategory === productData.category) {
-      oldCard.querySelector(".product-card__name").textContent =
-        productData.title;
-      oldCard.querySelector(".product-card__price").childNodes[0].textContent =
-        `${productData.price} ₽ `;
-      oldCard.querySelector(".product-card__unit").textContent =
-        `/ ${productData.priceUnit}`;
-
-      const imgCont = oldCard.querySelector(".product-card__img");
-      if (productData.image) {
-        imgCont.innerHTML = `<img src="${productData.image}" alt="${productData.title}">`;
-        imgCont.classList.remove("product-card__img--empty");
-      } else {
-        imgCont.innerHTML = "📦";
-        imgCont.classList.add("product-card__img--empty");
-      }
-
-      if (window.addToHistory)
-        addToHistory(editingProductId, "Данные обновлены через форму");
-    } else {
-      deleteProduct(editingProductId);
-      renderProduct({ id: editingProductId, ...productData });
-      if (window.addToHistory)
-        addToHistory(
-          editingProductId,
-          `Категория изменена на "${productData.category}"`,
-        );
-    }
+    const hasChanges = 
+      originalProductData.name !== title ||
+      originalProductData.price !== parseInt(rawPrice) ||
+      originalProductData.category !== category ||
+      originalProductData.unit !== formData.get("price-unit");
+    
+    if (hasChanges && !confirm("Вы уверены, что хотите изменить этот товар?")) return;
+    
+    removeProductCard(editingProductId);
+    renderProduct({ id: editingProductId, ...productData });
   } else {
-    const newId = Date.now();
-    renderProduct({ id: newId, ...productData });
-    if (window.addToHistory) addToHistory(newId, "Товар создан");
+    renderProduct({ id: Date.now(), ...productData });
   }
 
   closeForm();
@@ -320,96 +295,118 @@ window.deleteProduct = (id) => {
   document.querySelector(".product-menu")?.remove();
 };
 
+window.removeProductCard = (id) => {
+  const card = document.querySelector(`.product-card[data-id="${id}"]`);
+  if (card) card.remove();
+
+  if (
+    document.querySelectorAll(".product-card").length === 0 &&
+    document.querySelectorAll(".category-section").length === 0
+  ) {
+    emptyState.style.display = "flex";
+  }
+};
+
 window.editProduct = (id) => {
   const card = document.querySelector(`.product-card[data-id="${id}"]`);
   const name = card.querySelector(".product-card__name").textContent;
-  const priceText = card.querySelector(".product-card__price").textContent;
-  const price = parseInt(priceText);
-
-  const unitText = card
+  const price = parseInt(
+    card.querySelector(".product-card__price").textContent,
+  );
+  const unit = card
     .querySelector(".product-card__unit")
-    .textContent.replace("/", "")
+    .textContent.replace("/ ", "")
     .trim();
-
   const category = card.closest(".category-section").dataset.category;
+  const image = card.querySelector("img")?.src || null;
+
+  const menu = document.querySelector(".product-menu");
+  if (menu) menu.remove();
 
   editingProductId = id;
+  originalProductData = { name, price, category, unit };
 
-  openForm();
+  addForm.style.display = "flex";
+  document.body.style.overflow = "hidden";
 
   document.querySelector("#product-name").value = name;
   document.querySelector("#product-price").value = price;
 
-  const radioToSelect = document.querySelector(
-    `input[name="price-unit"][value="${unitText}"]`,
-  );
-  if (radioToSelect) radioToSelect.checked = true;
+  selectField.value = category;
+  inputField.classList.add("is-hidden");
+  inputField.style.display = "none";
+  inputField.disabled = true;
+  toggleBtn.textContent = "+ Добавить новую категорию";
+  toggleBtn.style.display = "block";
 
-  const optionToSelect = Array.from(selectField.options).find(
-    (opt) => opt.value === category,
-  );
+  document.querySelectorAll('input[name="price-unit"]').forEach((radio) => {
+    radio.checked = radio.value === unit;
+  });
 
-  if (optionToSelect) {
-    selectField.value = category;
-    inputField.classList.add("is-hidden");
-    inputField.style.display = "none";
-    inputField.disabled = true;
-    selectField.classList.remove("is-hidden");
-    selectField.disabled = false;
-    toggleBtn.textContent = "+ Добавить новую категорию";
-  } else {
-    inputField.value = category;
-    inputField.classList.remove("is-hidden");
-    inputField.style.display = "block";
-    inputField.disabled = false;
-    selectField.classList.add("is-hidden");
-    selectField.disabled = true;
-    toggleBtn.textContent = "Назад к выбору";
+  imageInput.value = "";
+  const existingImagePreview = document.querySelector(".add-form__image-preview");
+  if (existingImagePreview) existingImagePreview.remove();
+  
+  if (image) {
+    const preview = document.createElement("div");
+    preview.className = "add-form__image-preview";
+    preview.style.cssText = "margin-top: 10px; position: relative; width: 60px; height: 60px; border-radius: 5px; overflow: hidden;";
+    preview.innerHTML = `
+      <img src="${image}" style="width: 100%; height: 100%; object-fit: cover;">
+      <button type="button" style="position: absolute; top: 0; right: 0; background: red; color: white; border: none; padding: 2px 5px; cursor: pointer; border-radius: 0 5px 0 0;" onclick="event.preventDefault(); this.closest('.add-form__image-preview').remove(); document.querySelector('#product-image').value = '';">✕</button>
+    `;
+    imageInput.parentElement.insertBefore(preview, imageInput.nextElementSibling);
   }
 
   document.querySelector(".add-form__title").textContent = "Редактирование";
   document.querySelector(".add-form__btn-submit").textContent = "Сохранить";
-
-  document.querySelector(".product-menu")?.remove();
 };
 
 window.moveProduct = (id) => {
   const card = document.querySelector(`.product-card[data-id="${id}"]`);
-  const currentCategory = card.closest(".category-section").dataset.category;
+  const currentCat = card.closest(".category-section").dataset.category;
 
-  let newCategory = prompt(
-    "Введите название новой категории:",
-    currentCategory,
-  );
+  let newCat = prompt("Введите новую категорию:", currentCat);
 
-  if (newCategory) {
-    newCategory = formatString(newCategory);
+  if (!newCat) return;
+  
+  newCat = formatString(newCat);
 
-    if (newCategory.length > 25) {
-      alert("Название категории слишком длинное (макс. 25 символов)");
-      return;
-    }
-
-    if (newCategory !== currentCategory) {
-      const name = card.querySelector(".product-card__name").textContent;
-      const priceText = card.querySelector(".product-card__price").textContent;
-      const price = parseInt(priceText);
-      const priceUnit = card
-        .querySelector(".product-card__unit")
-        .textContent.replace("/ ", "");
-      const image = card.querySelector("img")?.src || null;
-
-      deleteProduct(id);
-      renderProduct({
-        id: id,
-        title: name,
-        price: price,
-        priceUnit: priceUnit,
-        category: newCategory,
-        image: image,
-      });
-    }
+  if (newCat.length > 25) {
+    alert("Название категории слишком длинное!");
+    return;
   }
+
+  const sections = Array.from(document.querySelectorAll(".category-section"));
+  const categoryNames = sections.map((s) => s.dataset.category);
+  const categoryExists = categoryNames.some((cat) => cat.toLowerCase() === newCat.toLowerCase());
+
+  if (newCat === currentCat) return;
+
+  if (!categoryExists) {
+    if (!confirm(`Категория "${newCat}" не существует. Хотите её создать?`)) return;
+  } else {
+    if (!confirm(`Вы уверены, что хотите переместить товар в категорию "${newCat}"?`)) return;
+  }
+
+  const name = card.querySelector(".product-card__name").textContent;
+  const priceText = card.querySelector(".product-card__price").textContent;
+  const price = parseInt(priceText);
+  const priceUnit = card
+    .querySelector(".product-card__unit")
+    .textContent.replace("/ ", "")
+    .trim();
+  const image = card.querySelector("img")?.src || null;
+
+  removeProductCard(id);
+  renderProduct({
+    id: id,
+    title: name,
+    price: price,
+    priceUnit: priceUnit,
+    category: newCat,
+    image: image,
+  });
 };
 
 window.closeTransferModal = () => {
@@ -512,8 +509,22 @@ window.deleteCategory = (categoryName) => {
 };
 
 window.editCategoryName = (oldName) => {
-  const newName = prompt("Новое название категории:", oldName);
-  if (!newName || newName === oldName) return;
+  let newName = prompt("Новое название категории:", oldName);
+  if (!newName) return;
+  
+  newName = formatString(newName);
+  
+  if (newName === oldName) {
+    alert("Название категории не изменилось!");
+    return;
+  }
+  
+  if (newName.length > 25) {
+    alert("Название категории не может быть длиннее 25 символов!");
+    return;
+  }
+  
+  if (!confirm(`Вы уверены, что хотите переименовать "${oldName}" в "${newName}"?`)) return;
 
   const section = document.querySelector(
     `.category-section[data-category="${oldName}"]`,
@@ -569,21 +580,15 @@ window.openCategoryMenu = (e, categoryName) => {
 window.addProductToCategory = (categoryName) => {
   openForm();
 
-  selectField.classList.remove("is-hidden");
-  selectField.disabled = false;
   inputField.classList.add("is-hidden");
-  inputField.disabled = true;
   inputField.style.display = "none";
-
+  inputField.disabled = true;
+  selectField.classList.remove("is-hidden");
   selectField.value = categoryName;
-  if (selectField.value !== categoryName) {
-    const newOpt = new Option(categoryName, categoryName);
-    selectField.add(newOpt);
-    selectField.value = categoryName;
-  }
-
   selectField.disabled = true;
   toggleBtn.style.display = "none";
+  
+  lockedCategory = categoryName;
 
   document.querySelector(".product-menu")?.remove();
 };
