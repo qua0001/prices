@@ -1,3 +1,18 @@
+const supabaseUrl = 'https://nmenoermkncathrgucds.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tZW5vZXJta25jYXRocmd1Y2RzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NzY0MjksImV4cCI6MjA5MzA1MjQyOX0.QB0dn_-HR6tmzvOLbENQfc2l5K1JG7wXttJoW3PHT5I'; 
+
+let supabaseClient = null;
+
+const initSupabase = () => {
+  if (window.supabase) {
+    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+    console.log('✅ Supabase инициализирован');
+    fetchProducts();
+  } else {
+    console.error('❌ Supabase библиотека не загружена');
+  }
+};
+
 const createBtn = document.querySelector(".create-button");
 const addForm = document.querySelector(".add-form");
 const cancelBtn = document.querySelector(".add-form__btn-cancel");
@@ -16,6 +31,7 @@ const lightboxImg = lightbox.querySelector(".lightbox__img");
 let editingProductId = null;
 let originalProductData = null;
 let lockedCategory = null;
+let productToMove = null;
 
 const formatString = (str) => {
   if (!str) return "";
@@ -236,10 +252,50 @@ addFormElement.addEventListener("submit", async (event) => {
     
     if (hasChanges && !confirm("Вы уверены, что хотите изменить этот товар?")) return;
     
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from('products')
+        .update({
+          title: productData.title,
+          price: productData.price,
+          price_unit: productData.priceUnit,
+          category: productData.category,
+          image: productData.image
+        })
+        .eq('id', editingProductId);
+
+      if (error) {
+        console.error('Ошибка Supabase:', error);
+        return alert('Ошибка при обновлении в облако: ' + error.message);
+      }
+    }
+    
     removeProductCard(editingProductId);
     renderProduct({ id: editingProductId, ...productData });
   } else {
-    renderProduct({ id: Date.now(), ...productData });
+    if (supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from('products')
+        .insert([
+          {
+            title: productData.title,
+            price: productData.price,
+            price_unit: productData.priceUnit,
+            category: productData.category,
+            image: productData.image
+          }
+        ])
+        .select();
+
+      if (error) {
+        console.error('Ошибка Supabase:', error);
+        return alert('Ошибка при сохранении в облако: ' + error.message);
+      }
+
+      renderProduct(data[0]);
+    } else {
+      renderProduct({ id: Date.now(), ...productData });
+    }
   }
 
   closeForm();
@@ -280,8 +336,20 @@ document.addEventListener("click", (e) => {
   }
 });
 
-window.deleteProduct = (id) => {
+window.deleteProduct = async (id) => {
   if (!confirm("Удалить этот товар?")) return;
+
+  if (supabaseClient) {
+    const { error } = await supabaseClient
+      .from('products')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Ошибка Supabase:', error);
+      return alert("Не удалось удалить из облака: " + error.message);
+    }
+  }
 
   const card = document.querySelector(`.product-card[data-id="${id}"]`);
   if (card) card.remove();
@@ -603,4 +671,45 @@ document.addEventListener("click", (e) => {
 
 lightbox.addEventListener("click", () => {
   lightbox.classList.remove("is-active");
+});
+
+async function fetchProducts() {
+  if (!supabaseClient) {
+    console.error('❌ Supabase не инициализирован');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      emptyState.style.display = "none";
+      data.forEach(product => {
+        renderProduct({
+          id: product.id,
+          title: product.title,
+          price: product.price,
+          priceUnit: product.price_unit,
+          category: product.category,
+          image: product.image
+        });
+      });
+      console.log(`✅ Загружено ${data.length} товаров`);
+    } else {
+      console.log('ℹ️ Товаров в базе не найдено');
+    }
+  } catch (error) {
+    console.error('❌ Ошибка загрузки данных:', error.message);
+  }
+}
+
+// Инициализация при загрузке страницы
+window.addEventListener('load', () => {
+  console.log('📋 Страница загружена, инициализируем Supabase...');
+  initSupabase();
 });
