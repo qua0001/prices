@@ -39,6 +39,58 @@ const formatString = (str) => {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
 };
 
+// Функция для сортировки категорий в алфавитном порядке
+const sortCategories = () => {
+  const sections = Array.from(document.querySelectorAll(".category-section"));
+  const sortedSections = sections.sort((a, b) => 
+    a.dataset.category.localeCompare(b.dataset.category, 'ru')
+  );
+  
+  sortedSections.forEach(section => {
+    productList.appendChild(section);
+  });
+};
+
+// Функция для сортировки товаров в категории в алфавитном порядке
+const sortProductsInCategory = (categoryName) => {
+  const categorySection = document.querySelector(`.category-section[data-category="${categoryName}"]`);
+  if (!categorySection) return;
+  
+  const listContainer = categorySection.querySelector(".category-section__list");
+  const products = Array.from(listContainer.querySelectorAll(".product-card"));
+  
+  const sortedProducts = products.sort((a, b) => {
+    const nameA = a.querySelector(".product-card__name").textContent;
+    const nameB = b.querySelector(".product-card__name").textContent;
+    return nameA.localeCompare(nameB, 'ru');
+  });
+  
+  sortedProducts.forEach(product => {
+    listContainer.appendChild(product);
+  });
+};
+
+// Функция для обновления опций select на основе существующих категорий
+const updateSelectOptions = () => {
+  const existingCategories = Array.from(document.querySelectorAll(".category-section"))
+    .map(section => section.dataset.category)
+    .sort((a, b) => a.localeCompare(b, 'ru'));
+  
+  // Очищаем select кроме первой опции (placeholder)
+  const placeholder = selectField.options[0];
+  while (selectField.options.length > 1) {
+    selectField.remove(1);
+  }
+  
+  // Добавляем только существующие категории
+  existingCategories.forEach(category => {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = category;
+    selectField.appendChild(option);
+  });
+};
+
 const productsHistory = {};
 
 window.addToHistory = (id, message) => {
@@ -155,11 +207,20 @@ window.ensureCategory = (categoryName) => {
     categorySection = document.querySelector(
       `.category-section[data-category="${categoryName}"]`,
     );
+    
+    // Обновляем опции select чтобы отражать все существующие категории
+    updateSelectOptions();
+    
+    // Сортируем категории после добавления новой
+    sortCategories();
   }
   return categorySection;
 };
 
 const renderProduct = (product) => {
+  // Гарантируем, что priceUnit всегда имеет значение
+  const priceUnit = product.priceUnit || 'шт.';
+  
   const categorySection = ensureCategory(product.category);
   const listContainer = categorySection.querySelector(
     ".category-section__list",
@@ -174,12 +235,15 @@ const renderProduct = (product) => {
       ${imageHtml}
       <div class="product-card__info">
         <h3 class="product-card__name">${product.title}</h3>
-        <div class="product-card__price">${product.price} ₽ <span class="product-card__unit">/ ${product.priceUnit}</span></div>
+        <div class="product-card__price">${product.price} ₽ <span class="product-card__unit">/ ${priceUnit}</span></div>
       </div>
       <button class="product-card__menu-btn" onclick="openProductMenu(event, '${product.id}')">⋮</button>
     </div>
   `;
   listContainer.insertAdjacentHTML("afterbegin", productHtml);
+  
+  // Сортируем товары в категории
+  sortProductsInCategory(product.category);
 };
 
 addFormElement.addEventListener("submit", async (event) => {
@@ -190,6 +254,7 @@ addFormElement.addEventListener("submit", async (event) => {
   const rawPrice = formData.get("product-price");
   const isCustomActive = !inputField.classList.contains("is-hidden");
   const selectIsDisabled = selectField.disabled;
+  const priceUnitValue = formData.get("price-unit") || 'шт.';
 
   const title = formatString(rawTitle);
   if (!title) return alert("Введите название");
@@ -207,19 +272,21 @@ addFormElement.addEventListener("submit", async (event) => {
   if (!category || category === "Выберите категорию..." || category === "")
     category = "Без категории";
 
+  // Улучшенная проверка дубликатов - используем dataset.id для сравнения
   const isDuplicate = Array.from(
     document.querySelectorAll(".product-card"),
   ).some((card) => {
-    return (
-      card.querySelector(".product-card__name").textContent.toLowerCase() ===
-        title.toLowerCase() && card.dataset.id !== String(editingProductId)
-    );
+    const cardId = card.dataset.id;
+    const isSameProduct = cardId === String(editingProductId);
+    const cardName = card.querySelector(".product-card__name").textContent.toLowerCase();
+    
+    return cardName === title.toLowerCase() && !isSameProduct;
   });
 
   if (isDuplicate) return alert("Такой товар уже есть!");
 
   if (title.length > 40) return alert("Название не может быть длиннее 40 символов");
-  if (!isCustomActive && category.length > 25) return alert("Категория не может быть длиннее 25 символов");
+  if (category.length > 25) return alert("Категория не может быть длиннее 25 символов");
 
   let imageData = null;
   const file = imageInput.files[0];
@@ -238,7 +305,7 @@ addFormElement.addEventListener("submit", async (event) => {
   const productData = {
     title,
     price: parseInt(rawPrice),
-    priceUnit: formData.get("price-unit"),
+    priceUnit: priceUnitValue,
     category,
     image: imageData,
   };
@@ -248,9 +315,14 @@ addFormElement.addEventListener("submit", async (event) => {
       originalProductData.name !== title ||
       originalProductData.price !== parseInt(rawPrice) ||
       originalProductData.category !== category ||
-      originalProductData.unit !== formData.get("price-unit");
+      originalProductData.unit !== priceUnitValue;
     
-    if (hasChanges && !confirm("Вы уверены, что хотите изменить этот товар?")) return;
+    // Если меняется только категория - показываем специальное подтверждение как при перемещении
+    if (originalProductData.category !== category && hasChanges) {
+      if (!confirm(`Вы уверены, что хотите переместить товар в категорию "${category}"?`)) return;
+    } else if (hasChanges && !confirm("Вы уверены, что хотите изменить этот товар?")) {
+      return;
+    }
     
     if (supabaseClient) {
       const { error } = await supabaseClient
@@ -270,8 +342,38 @@ addFormElement.addEventListener("submit", async (event) => {
       }
     }
     
-    removeProductCard(editingProductId);
-    renderProduct({ id: editingProductId, ...productData });
+    // При редактировании - обновляем без удаления и переиндекса
+    const card = document.querySelector(`.product-card[data-id="${editingProductId}"]`);
+    if (card) {
+      // Обновляем содержимое карточки - используем textContent вместо innerHTML для безопасности
+      card.querySelector(".product-card__name").textContent = productData.title;
+      card.querySelector(".product-card__price").textContent = `${productData.price} ₽ `;
+      card.querySelector(".product-card__unit").textContent = `/ ${productData.priceUnit}`;
+      
+      // Обновляем изображение если изменилось
+      if (productData.image !== image) {
+        const imageContainer = card.querySelector(".product-card__img");
+        const newImageHtml = productData.image
+          ? `<img src="${productData.image}" alt="${productData.title}">`
+          : `📦`;
+        if (productData.image) {
+          imageContainer.innerHTML = `<img src="${productData.image}" alt="${productData.title}">`;
+          imageContainer.classList.remove("product-card__img--empty");
+        } else {
+          imageContainer.textContent = '📦';
+          imageContainer.classList.add("product-card__img--empty");
+        }
+      }
+      
+      // Если категория изменилась - перемещаем товар
+      if (originalProductData.category !== category) {
+        removeProductCard(editingProductId);
+        renderProduct({ id: editingProductId, ...productData });
+      } else {
+        // Переостраиваем сортировку в категории
+        sortProductsInCategory(category);
+      }
+    }
   } else {
     if (supabaseClient) {
       const { data, error } = await supabaseClient
@@ -352,7 +454,17 @@ window.deleteProduct = async (id) => {
   }
 
   const card = document.querySelector(`.product-card[data-id="${id}"]`);
-  if (card) card.remove();
+  if (card) {
+    const categorySection = card.closest(".category-section");
+    card.remove();
+    
+    // Если категория стала пустой - удаляем ее
+    if (categorySection && categorySection.querySelectorAll(".product-card").length === 0) {
+      categorySection.remove();
+      // Обновляем select после удаления пустой категории
+      updateSelectOptions();
+    }
+  }
 
   if (
     document.querySelectorAll(".product-card").length === 0 &&
@@ -378,13 +490,12 @@ window.removeProductCard = (id) => {
 window.editProduct = (id) => {
   const card = document.querySelector(`.product-card[data-id="${id}"]`);
   const name = card.querySelector(".product-card__name").textContent;
-  const price = parseInt(
-    card.querySelector(".product-card__price").textContent,
-  );
-  const unit = card
-    .querySelector(".product-card__unit")
-    .textContent.replace("/ ", "")
-    .trim();
+  const priceText = card.querySelector(".product-card__price").textContent;
+  const price = parseInt(priceText);
+  const unitText = card.querySelector(".product-card__unit").textContent;
+  const unit = unitText.replace("/ ", "").trim() || 'шт.';
+  
+  // Получаем категорию напрямую из DOM структуры (работает для всех товаров, включая перемещенные)
   const category = card.closest(".category-section").dataset.category;
   const image = card.querySelector("img")?.src || null;
 
@@ -400,13 +511,17 @@ window.editProduct = (id) => {
   document.querySelector("#product-name").value = name;
   document.querySelector("#product-price").value = price;
 
+  // Обновляем select опции и выбираем правильную категорию
+  updateSelectOptions();
   selectField.value = category;
+  
   inputField.classList.add("is-hidden");
   inputField.style.display = "none";
   inputField.disabled = true;
   toggleBtn.textContent = "+ Добавить новую категорию";
   toggleBtn.style.display = "block";
 
+  // Устанавливаем правильное значение price-unit
   document.querySelectorAll('input[name="price-unit"]').forEach((radio) => {
     radio.checked = radio.value === unit;
   });
@@ -460,10 +575,8 @@ window.moveProduct = (id) => {
   const name = card.querySelector(".product-card__name").textContent;
   const priceText = card.querySelector(".product-card__price").textContent;
   const price = parseInt(priceText);
-  const priceUnit = card
-    .querySelector(".product-card__unit")
-    .textContent.replace("/ ", "")
-    .trim();
+  const unitText = card.querySelector(".product-card__unit").textContent;
+  const priceUnit = unitText.replace("/ ", "").trim() || 'шт.';
   const image = card.querySelector("img")?.src || null;
 
   removeProductCard(id);
@@ -503,7 +616,7 @@ window.confirmTransfer = () => {
     if (suggestion) {
       if (
         confirm(
-          `Категории "${newCat}" не существует. Использовать похожу disguised как "${suggestion}"?`,
+          `Категории "${newCat}" не существует. Использовать похожую как "${suggestion}"?`,
         )
       ) {
         newCat = suggestion;
@@ -531,9 +644,9 @@ window.confirmTransfer = () => {
   const name = card.querySelector(".product-card__name").textContent;
   const priceText = card.querySelector(".product-card__price").textContent;
   const price = parseInt(priceText);
-  const priceUnit = card
-    .querySelector(".product-card__unit")
-    .textContent.replace("/ ", "");
+  const unitText = card.querySelector(".product-card__unit").textContent;
+  const priceUnit = unitText.replace("/ ", "").trim() || 'шт.';
+  const image = card.querySelector("img")?.src || null;
 
   deleteProductForMove(productToMove);
 
@@ -543,6 +656,7 @@ window.confirmTransfer = () => {
     price: price,
     priceUnit: priceUnit,
     category: newCat,
+    image: image,
   });
 
   if (window.addToHistory) {
@@ -573,6 +687,10 @@ window.deleteCategory = (categoryName) => {
   if (document.querySelectorAll(".category-section").length === 0) {
     emptyState.style.display = "flex";
   }
+  
+  // Обновляем опции select чтобы отражать удаленную категорию
+  updateSelectOptions();
+  
   document.querySelector(".product-menu")?.remove();
 };
 
@@ -602,6 +720,12 @@ window.editCategoryName = (oldName) => {
     section.querySelector(".category-section__title").textContent = newName;
     const menuBtn = section.querySelector(".category-section__menu-btn");
     menuBtn.setAttribute("onclick", `openCategoryMenu(event, '${newName}')`);
+    
+    // Обновляем select опции чтобы отражать новое имя категории
+    updateSelectOptions();
+    
+    // Пересортируем категории после переименования
+    sortCategories();
   }
   document.querySelector(".product-menu")?.remove();
 };
@@ -694,12 +818,15 @@ async function fetchProducts() {
           id: product.id,
           title: product.title,
           price: product.price,
-          priceUnit: product.price_unit,
+          priceUnit: product.price_unit || 'шт.',
           category: product.category,
           image: product.image
         });
       });
       console.log(`✅ Загружено ${data.length} товаров`);
+      
+      // Обновляем опции select на основе загруженных категорий
+      updateSelectOptions();
     } else {
       console.log('ℹ️ Товаров в базе не найдено');
     }
@@ -711,5 +838,18 @@ async function fetchProducts() {
 // Инициализация при загрузке страницы
 window.addEventListener('load', () => {
   console.log('📋 Страница загружена, инициализируем Supabase...');
+  
+  // Запрет на копирование
+  document.body.style.userSelect = 'none';
+  document.body.style.webkitUserSelect = 'none';
+  document.body.style.MozUserSelect = 'none';
+  document.body.style.msUserSelect = 'none';
+  
   initSupabase();
+});
+
+// Дополнительный запрет на копирование через JavaScript
+document.addEventListener('copy', (e) => {
+  e.preventDefault();
+  return false;
 });
