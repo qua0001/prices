@@ -3,30 +3,48 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 let supabaseClient = null;
 
+// Переменные для элементов DOM (инициализируются при DOMContentLoaded)
+let createBtn;
+let addForm;
+let cancelBtn;
+let overlay;
+let toggleBtn;
+let inputField;
+let selectField;
+let addFormElement;
+let productList;
+let emptyState;
+let formContent;
+let imageInput;
+let lightbox;
+let lightboxImg;
+
 const initSupabase = () => {
   if (window.supabase) {
     supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
     console.log('✅ Supabase инициализирован');
-    fetchProducts();
+    fetchProducts(); // Загружаем товары и извлекаем категории из них
   } else {
     console.error('❌ Supabase библиотека не загружена');
   }
 };
 
-const createBtn = document.querySelector(".create-button");
-const addForm = document.querySelector(".add-form");
-const cancelBtn = document.querySelector(".add-form__btn-cancel");
-const overlay = document.querySelector(".add-form__overlay");
-const toggleBtn = document.querySelector(".add-form__toggle-btn");
-const inputField = document.querySelector("#add-category");
-const selectField = document.querySelector("#product-category");
-const addFormElement = document.querySelector(".add-form form");
-const productList = document.querySelector(".product-list");
-const emptyState = document.querySelector(".empty-state");
-const formContent = document.querySelector(".add-form__content");
-const imageInput = document.querySelector("#product-image");
-const lightbox = document.querySelector("#image-lightbox");
-const lightboxImg = lightbox.querySelector(".lightbox__img");
+const initializeDOMElements = () => {
+  createBtn = document.querySelector(".create-button");
+  addForm = document.querySelector(".add-form");
+  cancelBtn = document.querySelector(".add-form__btn-cancel");
+  overlay = document.querySelector(".add-form__overlay");
+  toggleBtn = document.querySelector(".add-form__toggle-btn");
+  inputField = document.querySelector("#add-category");
+  selectField = document.querySelector("#product-category");
+  addFormElement = document.querySelector(".add-form form");
+  productList = document.querySelector(".product-list");
+  emptyState = document.querySelector(".empty-state");
+  formContent = document.querySelector(".add-form__content");
+  imageInput = document.querySelector("#product-image");
+  lightbox = document.querySelector("#image-lightbox");
+  lightboxImg = lightbox.querySelector(".lightbox__img");
+};
 
 let editingProductId = null;
 let originalProductData = null;
@@ -70,6 +88,19 @@ const sortProductsInCategory = (categoryName) => {
   });
 };
 
+// Сохраняем категории в localStorage
+const saveCategoriesLocally = () => {
+  const categories = Array.from(document.querySelectorAll(".category-section"))
+    .map(section => section.dataset.category);
+  localStorage.setItem('categories', JSON.stringify(categories));
+};
+
+// Загружаем категории из localStorage
+const loadCategoriesLocally = () => {
+  const stored = localStorage.getItem('categories');
+  return stored ? JSON.parse(stored) : [];
+};
+
 // Функция для обновления опций select на основе существующих категорий
 const updateSelectOptions = () => {
   const existingCategories = Array.from(document.querySelectorAll(".category-section"))
@@ -89,7 +120,63 @@ const updateSelectOptions = () => {
     option.textContent = category;
     selectField.appendChild(option);
   });
+  
+  // Сохраняем категории в localStorage
+  saveCategoriesLocally();
 };
+
+// Загружаем товары и извлекаем категории из них
+async function fetchProducts() {
+  if (!supabaseClient) {
+    console.error('❌ Supabase не инициализирован');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Загружаем сохраненные категории из localStorage
+    const savedCategories = loadCategoriesLocally();
+    
+    if (data && data.length > 0) {
+      emptyState.style.display = "none";
+      data.forEach(product => {
+        renderProduct({
+          id: product.id,
+          title: product.title,
+          price: product.price,
+          priceUnit: product.price_unit || 'шт.',
+          category: product.category,
+          image: product.image
+        });
+      });
+      console.log(`✅ Загружено ${data.length} товаров`);
+      
+      // Обновляем опции select на основе загруженных категорий
+      updateSelectOptions();
+    } else {
+      console.log('ℹ️ Товаров в базе не найдено');
+    }
+    
+    // Восстанавливаем пустые категории из localStorage
+    savedCategories.forEach(categoryName => {
+      const existing = document.querySelector(`.category-section[data-category="${categoryName}"]`);
+      if (!existing) {
+        ensureCategoryExists(categoryName);
+      }
+    });
+    
+    // Обновляем select еще раз со всеми категориями
+    updateSelectOptions();
+  } catch (error) {
+    console.error('❌ Ошибка загрузки данных:', error.message);
+  }
+}
 
 const productsHistory = {};
 
@@ -126,7 +213,7 @@ window.closeHistory = () => {
   document.querySelector("#history-modal").style.display = "none";
 };
 
-const openForm = () => {
+window.openForm = () => {
   addForm.style.display = "flex";
   document.body.style.overflow = "hidden";
 
@@ -139,7 +226,7 @@ const openForm = () => {
   if (existingImagePreview) existingImagePreview.remove();
 };
 
-const closeForm = () => {
+window.closeForm = () => {
   addForm.style.display = "none";
   document.body.style.overflow = "auto";
   if (addFormElement) addFormElement.reset();
@@ -163,31 +250,8 @@ const closeForm = () => {
   if (existingImagePreview) existingImagePreview.remove();
 };
 
-createBtn.addEventListener("click", openForm);
-cancelBtn.addEventListener("click", closeForm);
-overlay.addEventListener("click", closeForm);
-
-toggleBtn.addEventListener("click", () => {
-  const isHidden = inputField.classList.contains("is-hidden");
-  if (isHidden) {
-    inputField.classList.remove("is-hidden");
-    inputField.style.display = "block";
-    inputField.disabled = false;
-    inputField.focus();
-    selectField.classList.add("is-hidden");
-    selectField.disabled = true;
-    toggleBtn.textContent = "Назад к выбору";
-  } else {
-    inputField.classList.add("is-hidden");
-    inputField.style.display = "none";
-    inputField.disabled = true;
-    selectField.classList.remove("is-hidden");
-    selectField.disabled = false;
-    toggleBtn.textContent = "+ Добавить новую категорию";
-  }
-});
-
-window.ensureCategory = (categoryName) => {
+// Создает UI секцию категории (без сохранения в БД - это делается отдельно)
+const ensureCategoryExists = (categoryName) => {
   let categorySection = document.querySelector(
     `.category-section[data-category="${categoryName}"]`,
   );
@@ -208,13 +272,18 @@ window.ensureCategory = (categoryName) => {
       `.category-section[data-category="${categoryName}"]`,
     );
     
-    // Обновляем опции select чтобы отражать все существующие категории
+    // Обновляем опции select
     updateSelectOptions();
     
-    // Сортируем категории после добавления новой
+    // Сортируем категории
     sortCategories();
   }
   return categorySection;
+};
+
+// Это для обратной совместимости - используется при добавлении товара
+window.ensureCategory = (categoryName) => {
+  return ensureCategoryExists(categoryName);
 };
 
 const renderProduct = (product) => {
@@ -246,7 +315,10 @@ const renderProduct = (product) => {
   sortProductsInCategory(product.category);
 };
 
-addFormElement.addEventListener("submit", async (event) => {
+const attachFormSubmitListener = () => {
+  if (!addFormElement) return;
+  
+  addFormElement.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(addFormElement);
 
@@ -342,38 +414,36 @@ addFormElement.addEventListener("submit", async (event) => {
       }
     }
     
-    // При редактировании - обновляем без удаления и переиндекса
-    const card = document.querySelector(`.product-card[data-id="${editingProductId}"]`);
-    if (card) {
-      // Обновляем содержимое карточки - используем textContent вместо innerHTML для безопасности
-      card.querySelector(".product-card__name").textContent = productData.title;
-      card.querySelector(".product-card__price").textContent = `${productData.price} ₽ `;
-      card.querySelector(".product-card__unit").textContent = `/ ${productData.priceUnit}`;
-      
-      // Обновляем изображение если изменилось
-      if (productData.image !== image) {
-        const imageContainer = card.querySelector(".product-card__img");
-        const newImageHtml = productData.image
-          ? `<img src="${productData.image}" alt="${productData.title}">`
-          : `📦`;
-        if (productData.image) {
-          imageContainer.innerHTML = `<img src="${productData.image}" alt="${productData.title}">`;
-          imageContainer.classList.remove("product-card__img--empty");
-        } else {
-          imageContainer.textContent = '📦';
-          imageContainer.classList.add("product-card__img--empty");
+    // Если категория изменилась - перемещаем товар
+    if (originalProductData.category !== category) {
+      removeProductCard(editingProductId);
+      renderProduct({ id: editingProductId, ...productData });
+    } else {
+      // При редактировании - обновляем без удаления и переиндекса
+      const card = document.querySelector(`.product-card[data-id="${editingProductId}"]`);
+      if (card) {
+        // Обновляем содержимое карточки - используем textContent вместо innerHTML для безопасности
+        card.querySelector(".product-card__name").textContent = productData.title;
+        card.querySelector(".product-card__price").innerHTML = `${productData.price} ₽ <span class="product-card__unit">/ ${productData.priceUnit}</span>`;
+        
+        // Обновляем изображение если изменилось
+        if (productData.image !== image) {
+          const imageContainer = card.querySelector(".product-card__img");
+          if (productData.image) {
+            imageContainer.innerHTML = `<img src="${productData.image}" alt="${productData.title}">`;
+            imageContainer.classList.remove("product-card__img--empty");
+          } else {
+            imageContainer.textContent = '📦';
+            imageContainer.classList.add("product-card__img--empty");
+          }
         }
-      }
-      
-      // Если категория изменилась - перемещаем товар
-      if (originalProductData.category !== category) {
-        removeProductCard(editingProductId);
-        renderProduct({ id: editingProductId, ...productData });
-      } else {
+        
         // Переостраиваем сортировку в категории
         sortProductsInCategory(category);
       }
     }
+    
+    closeForm();
   } else {
     if (supabaseClient) {
       const { data, error } = await supabaseClient
@@ -401,7 +471,8 @@ addFormElement.addEventListener("submit", async (event) => {
   }
 
   closeForm();
-});
+  });
+};
 
 document.addEventListener("click", (e) => {
   const menuBtn = e.target.closest(".product-card__menu-btn");
@@ -455,24 +526,29 @@ window.deleteProduct = async (id) => {
 
   const card = document.querySelector(`.product-card[data-id="${id}"]`);
   if (card) {
-    const categorySection = card.closest(".category-section");
+    const categoryName = card.closest('.category-section')?.dataset.category;
     card.remove();
     
-    // Если категория стала пустой - удаляем ее
-    if (categorySection && categorySection.querySelectorAll(".product-card").length === 0) {
-      categorySection.remove();
-      // Обновляем select после удаления пустой категории
-      updateSelectOptions();
+    // Если категория стала пустой, скрываем её раздел, но оставляем в localStorage
+    if (categoryName) {
+      const categorySection = document.querySelector(`.category-section[data-category="${categoryName}"]`);
+      if (categorySection) {
+        const productsInCategory = categorySection.querySelectorAll('.product-card').length || 0;
+        
+        if (productsInCategory === 0) {
+          categorySection.style.display = 'none';
+        }
+      }
     }
   }
 
-  if (
-    document.querySelectorAll(".product-card").length === 0 &&
-    document.querySelectorAll(".category-section").length === 0
-  ) {
+  // Если НЕТ товаров ВОО вообще - показываем пустое состояние
+  if (document.querySelectorAll(".product-card").length === 0) {
     emptyState.style.display = "flex";
   }
+  
   document.querySelector(".product-menu")?.remove();
+  updateSelectOptions();
 };
 
 window.removeProductCard = (id) => {
@@ -579,6 +655,17 @@ window.moveProduct = (id) => {
   const priceUnit = unitText.replace("/ ", "").trim() || 'шт.';
   const image = card.querySelector("img")?.src || null;
 
+  // Синхронизируем изменение категории с Supabase
+  if (supabaseClient) {
+    supabaseClient
+      .from('products')
+      .update({ category: newCat })
+      .eq('id', id)
+      .then(({ error }) => {
+        if (error) console.error('Ошибка при обновлении категории:', error);
+      });
+  }
+
   removeProductCard(id);
   renderProduct({
     id: id,
@@ -684,11 +771,22 @@ window.deleteCategory = (categoryName) => {
   );
   if (section) section.remove();
 
+  // Удаляем товары в БД
+  if (supabaseClient) {
+    supabaseClient
+      .from('products')
+      .delete()
+      .eq('category', categoryName)
+      .then(({ error }) => {
+        if (error) console.error('Ошибка при удалении товаров:', error);
+      });
+  }
+
   if (document.querySelectorAll(".category-section").length === 0) {
     emptyState.style.display = "flex";
   }
   
-  // Обновляем опции select чтобы отражать удаленную категорию
+  // Обновляем select
   updateSelectOptions();
   
   document.querySelector(".product-menu")?.remove();
@@ -720,13 +818,25 @@ window.editCategoryName = (oldName) => {
     section.querySelector(".category-section__title").textContent = newName;
     const menuBtn = section.querySelector(".category-section__menu-btn");
     menuBtn.setAttribute("onclick", `openCategoryMenu(event, '${newName}')`);
-    
-    // Обновляем select опции чтобы отражать новое имя категории
-    updateSelectOptions();
-    
-    // Пересортируем категории после переименования
-    sortCategories();
   }
+  
+  // Обновляем товары в БД с новой категорией
+  if (supabaseClient) {
+    supabaseClient
+      .from('products')
+      .update({ category: newName })
+      .eq('category', oldName)
+      .then(({ error }) => {
+        if (error) console.error('Ошибка при обновлении товаров:', error);
+      });
+  }
+  
+  // Обновляем select опции
+  updateSelectOptions();
+  
+  // Пересортируем категории
+  sortCategories();
+  
   document.querySelector(".product-menu")?.remove();
 };
 
@@ -785,59 +895,61 @@ window.addProductToCategory = (categoryName) => {
   document.querySelector(".product-menu")?.remove();
 };
 
-document.addEventListener("click", (e) => {
-  const productImg = e.target.closest(".product-card__img img");
-  if (productImg) {
-    lightboxImg.src = productImg.src;
-    lightbox.classList.add("is-active");
-  }
-});
-
-lightbox.addEventListener("click", () => {
-  lightbox.classList.remove("is-active");
-});
-
-async function fetchProducts() {
-  if (!supabaseClient) {
-    console.error('❌ Supabase не инициализирован');
-    return;
-  }
-
-  try {
-    const { data, error } = await supabaseClient
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    if (data && data.length > 0) {
-      emptyState.style.display = "none";
-      data.forEach(product => {
-        renderProduct({
-          id: product.id,
-          title: product.title,
-          price: product.price,
-          priceUnit: product.price_unit || 'шт.',
-          category: product.category,
-          image: product.image
-        });
-      });
-      console.log(`✅ Загружено ${data.length} товаров`);
-      
-      // Обновляем опции select на основе загруженных категорий
-      updateSelectOptions();
-    } else {
-      console.log('ℹ️ Товаров в базе не найдено');
+const attachImageLightboxListener = () => {
+  if (!lightbox) return;
+  
+  document.addEventListener("click", (e) => {
+    const productImg = e.target.closest(".product-card__img img");
+    if (productImg) {
+      lightboxImg.src = productImg.src;
+      lightbox.classList.add("is-active");
     }
-  } catch (error) {
-    console.error('❌ Ошибка загрузки данных:', error.message);
-  }
-}
+  });
+
+  lightbox.addEventListener("click", () => {
+    lightbox.classList.remove("is-active");
+  });
+};
 
 // Инициализация при загрузке страницы
 window.addEventListener('load', () => {
-  console.log('📋 Страница загружена, инициализируем Supabase...');
+  console.log('📋 Страница загружена, инициализируем...');
+  
+  // Инициализируем элементы DOM
+  initializeDOMElements();
+  
+  // Привязываем обработчики событий
+  if (createBtn) createBtn.addEventListener("click", openForm);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeForm);
+  if (overlay) overlay.addEventListener("click", closeForm);
+  
+  // Привязываем обработчик отправки формы
+  attachFormSubmitListener();
+  
+  // Привязываем обработчик лайтбокса
+  attachImageLightboxListener();
+  
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      const isHidden = inputField.classList.contains("is-hidden");
+      if (isHidden) {
+        inputField.classList.remove("is-hidden");
+        inputField.style.display = "block";
+        inputField.disabled = false;
+        inputField.focus();
+        selectField.classList.add("is-hidden");
+        selectField.disabled = true;
+        toggleBtn.textContent = "Назад к выбору";
+      } else {
+        inputField.classList.add("is-hidden");
+        inputField.style.display = "none";
+        inputField.disabled = true;
+        selectField.classList.remove("is-hidden");
+        selectField.disabled = false;
+        toggleBtn.textContent = "+ Добавить новую категорию";
+      }
+    });
+  }
   
   // Запрет на копирование
   document.body.style.userSelect = 'none';
@@ -845,6 +957,7 @@ window.addEventListener('load', () => {
   document.body.style.MozUserSelect = 'none';
   document.body.style.msUserSelect = 'none';
   
+  // Инициализируем Supabase
   initSupabase();
 });
 
