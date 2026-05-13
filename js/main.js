@@ -51,6 +51,7 @@ let editingProductId = null;
 let originalProductData = null;
 let lockedCategory = null;
 let productToMove = null;
+let isSubmitting = false; // Флаг для предотвращения двойной отправки
 
 const formatString = (str) => {
   if (!str) return "";
@@ -224,6 +225,11 @@ window.closeHistory = () => {
 };
 
 window.openForm = () => {
+  // Если DOM элементы еще не инициализированы, инициализируем
+  if (!addForm) {
+    initializeDOMElements();
+  }
+  
   addForm.style.display = "flex";
   document.body.style.overflow = "hidden";
 
@@ -239,6 +245,11 @@ window.openForm = () => {
 };
 
 window.closeForm = () => {
+  // Если DOM элементы еще не инициализированы, инициализируем
+  if (!addForm) {
+    initializeDOMElements();
+  }
+  
   addForm.style.display = "none";
   document.body.style.overflow = "auto";
   if (addFormElement) addFormElement.reset();
@@ -334,177 +345,200 @@ const attachFormSubmitListener = () => {
 
   addFormElement.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const formData = new FormData(addFormElement);
+    
+    // Предотвращаем двойную отправку
+    if (isSubmitting) return;
+    isSubmitting = true;
+    
+    try {
+      const formData = new FormData(addFormElement);
 
-    const rawTitle = formData.get("product-name");
-    const rawPrice = formData.get("product-price");
-    const isCustomActive = !inputField.classList.contains("is-hidden");
-    const selectIsDisabled = selectField.disabled;
-    const priceUnitValue = formData.get("price-unit") || "шт";
+      const rawTitle = formData.get("product-name");
+      const rawPrice = formData.get("product-price");
+      const isCustomActive = !inputField.classList.contains("is-hidden");
+      const selectIsDisabled = selectField.disabled;
+      const priceUnitValue = formData.get("price-unit") || "шт";
 
-    const title = formatString(rawTitle);
-    if (!title) return alert("Введите название");
-    if (rawPrice.length > 6) return alert("Максимум 6 цифр в цене");
-
-    let category;
-    if (selectIsDisabled && lockedCategory) {
-      category = lockedCategory;
-    } else if (isCustomActive) {
-      category = formatString(formData.get("custom-category"));
-    } else {
-      category = formatString(formData.get("product-category"));
-    }
-
-    if (!category || category === "Выберите категорию..." || category === "")
-      category = "Без категории";
-
-    // Улучшенная проверка дубликатов - используем dataset.id для сравнения
-    const isDuplicate = Array.from(
-      document.querySelectorAll(".product-card"),
-    ).some((card) => {
-      const cardId = card.dataset.id;
-      const isSameProduct = cardId === String(editingProductId);
-      const cardName = card
-        .querySelector(".product-card__name")
-        .textContent.toLowerCase();
-
-      return cardName === title.toLowerCase() && !isSameProduct;
-    });
-
-    if (isDuplicate) return alert("Такой товар уже есть!");
-
-    if (title.length > 40)
-      return alert("Название не может быть длиннее 40 символов");
-    if (category.length > 25)
-      return alert("Категория не может быть длиннее 25 символов");
-
-    let imageData = null;
-    const file = imageInput.files[0];
-    if (file) {
-      imageData = await new Promise((r) => {
-        const reader = new FileReader();
-        reader.onload = () => r(reader.result);
-        reader.readAsDataURL(file);
-      });
-    } else if (editingProductId) {
-      imageData =
-        document.querySelector(
-          `.product-card[data-id="${editingProductId}"] img`,
-        )?.src || null;
-    }
-
-    const productData = {
-      title,
-      price: parseInt(rawPrice),
-      priceUnit: priceUnitValue,
-      category,
-      image: imageData,
-    };
-
-    if (editingProductId) {
-      const hasChanges =
-        originalProductData.name !== title ||
-        originalProductData.price !== parseInt(rawPrice) ||
-        originalProductData.category !== category ||
-        originalProductData.unit !== priceUnitValue;
-
-      // Если меняется только категория - показываем специальное подтверждение как при перемещении
-      if (originalProductData.category !== category && hasChanges) {
-        if (
-          !confirm(
-            `Вы уверены, что хотите переместить товар в категорию "${category}"?`,
-          )
-        )
-          return;
-      } else if (
-        hasChanges &&
-        !confirm("Вы уверены, что хотите изменить этот товар?")
-      ) {
+      const title = formatString(rawTitle);
+      if (!title) {
+        alert("Введите название");
+        return;
+      }
+      if (rawPrice.length > 6) {
+        alert("Максимум 6 цифр в цене");
         return;
       }
 
-      if (supabaseClient) {
-        const { error } = await supabaseClient
-          .from("products")
-          .update({
-            title: productData.title,
-            price: productData.price,
-            price_unit: productData.priceUnit,
-            category: productData.category,
-            image: productData.image,
-          })
-          .eq("id", editingProductId);
-
-        if (error) {
-          console.error("Ошибка Supabase:", error);
-          return alert("Ошибка при обновлении в облако: " + error.message);
-        }
-      }
-
-      // Если категория изменилась - перемещаем товар
-      if (originalProductData.category !== category) {
-        removeProductCard(editingProductId);
-        renderProduct({ id: editingProductId, ...productData });
+      let category;
+      if (selectIsDisabled && lockedCategory) {
+        category = lockedCategory;
+      } else if (isCustomActive) {
+        category = formatString(formData.get("custom-category"));
       } else {
-        // При редактировании - обновляем без удаления и переиндекса
-        const card = document.querySelector(
-          `.product-card[data-id="${editingProductId}"]`,
-        );
-        if (card) {
-          // Обновляем содержимое карточки
-          card.querySelector(".product-card__name").textContent =
-            productData.title;
-          card.querySelector(".product-card__price").innerHTML =
-            `${productData.price} ₽ <span class="product-card__unit">/ ${productData.priceUnit}</span>`;
-
-          // ИСПРАВЛЕНИЕ: Получаем ссылку на текущую картинку прямо из верстки карточки
-          const currentImage = card.querySelector("img")?.src || null;
-
-          // Сравниваем с currentImage вместо несуществующей переменной
-          if (productData.image !== currentImage) {
-            const imageContainer = card.querySelector(".product-card__img");
-            if (productData.image) {
-              imageContainer.innerHTML = `<img src="${productData.image}" alt="${productData.title}">`;
-              imageContainer.classList.remove("product-card__img--empty");
-            } else {
-              imageContainer.textContent = "📦";
-              imageContainer.classList.add("product-card__img--empty");
-            }
-          }
-
-          // Переостраиваем сортировку в категории
-          sortProductsInCategory(category);
-        }
+        category = formatString(formData.get("product-category"));
       }
 
-      closeForm();
-    } else {
-      if (supabaseClient) {
-        const { data, error } = await supabaseClient
-          .from("products")
-          .insert([
-            {
+      if (!category || category === "Выберите категорию..." || category === "")
+        category = "Без категории";
+
+      // Улучшенная проверка дубликатов - используем dataset.id для сравнения
+      const isDuplicate = Array.from(
+        document.querySelectorAll(".product-card"),
+      ).some((card) => {
+        const cardId = card.dataset.id;
+        const isSameProduct = cardId === String(editingProductId);
+        const cardName = card
+          .querySelector(".product-card__name")
+          .textContent.toLowerCase();
+
+        return cardName === title.toLowerCase() && !isSameProduct;
+      });
+
+      if (isDuplicate) {
+        alert("Такой товар уже есть!");
+        return;
+      }
+
+      if (title.length > 40) {
+        alert("Название не может быть длиннее 40 символов");
+        return;
+      }
+      if (category.length > 25) {
+        alert("Категория не может быть длиннее 25 символов");
+        return;
+      }
+
+      let imageData = null;
+      const file = imageInput.files[0];
+      if (file) {
+        imageData = await new Promise((r) => {
+          const reader = new FileReader();
+          reader.onload = () => r(reader.result);
+          reader.readAsDataURL(file);
+        });
+      } else if (editingProductId) {
+        imageData =
+          document.querySelector(
+            `.product-card[data-id="${editingProductId}"] img`,
+          )?.src || null;
+      }
+
+      const productData = {
+        title,
+        price: parseInt(rawPrice),
+        priceUnit: priceUnitValue,
+        category,
+        image: imageData,
+      };
+
+      if (editingProductId) {
+        const hasChanges =
+          originalProductData.name !== title ||
+          originalProductData.price !== parseInt(rawPrice) ||
+          originalProductData.category !== category ||
+          originalProductData.unit !== priceUnitValue;
+
+        // Если меняется только категория - показываем специальное подтверждение как при перемещении
+        if (originalProductData.category !== category && hasChanges) {
+          if (
+            !confirm(
+              `Вы уверены, что хотите переместить товар в категорию "${category}"?`,
+            )
+          )
+            return;
+        } else if (
+          hasChanges &&
+          !confirm("Вы уверены, что хотите изменить этот товар?")
+        ) {
+          return;
+        }
+
+        if (supabaseClient) {
+          const { error } = await supabaseClient
+            .from("products")
+            .update({
               title: productData.title,
               price: productData.price,
               price_unit: productData.priceUnit,
               category: productData.category,
               image: productData.image,
-            },
-          ])
-          .select();
+            })
+            .eq("id", editingProductId);
 
-        if (error) {
-          console.error("Ошибка Supabase:", error);
-          return alert("Ошибка при сохранении в облако: " + error.message);
+          if (error) {
+            console.error("Ошибка Supabase:", error);
+            throw new Error("Ошибка при обновлении в облако: " + error.message);
+          }
         }
 
-        renderProduct(data[0]);
-      } else {
-        renderProduct({ id: Date.now(), ...productData });
-      }
-    }
+        // Если категория изменилась - перемещаем товар
+        if (originalProductData.category !== category) {
+          removeProductCard(editingProductId);
+          renderProduct({ id: editingProductId, ...productData });
+        } else {
+          // При редактировании - обновляем без удаления и переиндекса
+          const card = document.querySelector(
+            `.product-card[data-id="${editingProductId}"]`,
+          );
+          if (card) {
+            // Обновляем содержимое карточки
+            card.querySelector(".product-card__name").textContent =
+              productData.title;
+            card.querySelector(".product-card__price").innerHTML =
+              `${productData.price} ₽ <span class="product-card__unit">/ ${productData.priceUnit}</span>`;
 
-    closeForm();
+            // ИСПРАВЛЕНИЕ: Получаем ссылку на текущую картинку прямо из верстки карточки
+            const currentImage = card.querySelector("img")?.src || null;
+
+            // Сравниваем с currentImage вместо несуществующей переменной
+            if (productData.image !== currentImage) {
+              const imageContainer = card.querySelector(".product-card__img");
+              if (productData.image) {
+                imageContainer.innerHTML = `<img src="${productData.image}" alt="${productData.title}">`;
+                imageContainer.classList.remove("product-card__img--empty");
+              } else {
+                imageContainer.textContent = "📦";
+                imageContainer.classList.add("product-card__img--empty");
+              }
+            }
+
+            // Переостраиваем сортировку в категории
+            sortProductsInCategory(category);
+          }
+        }
+      } else {
+        if (supabaseClient) {
+          const { data, error } = await supabaseClient
+            .from("products")
+            .insert([
+              {
+                title: productData.title,
+                price: productData.price,
+                price_unit: productData.priceUnit,
+                category: productData.category,
+                image: productData.image,
+              },
+            ])
+            .select();
+
+          if (error) {
+            console.error("Ошибка Supabase:", error);
+            throw new Error("Ошибка при сохранении в облако: " + error.message);
+          }
+
+          renderProduct(data[0]);
+        } else {
+          renderProduct({ id: Date.now(), ...productData });
+        }
+      }
+
+    } catch (error) {
+      console.error('Ошибка при сохранении:', error);
+      alert(error.message || 'Произошла ошибка при сохранении товара');
+    } finally {
+      isSubmitting = false;
+      closeForm();
+    }
   });
 };
 
@@ -572,9 +606,8 @@ window.deleteProduct = async (id) => {
         const productsInCategory =
           categorySection.querySelectorAll(".product-card").length || 0;
 
-        if (productsInCategory === 0) {
-          categorySection.style.display = "none";
-        }
+        // Пустые категории остаются видимыми (не скрываем через display:none)
+        // Это обеспечивает синхронизацию между устройствами
       }
     }
   }
