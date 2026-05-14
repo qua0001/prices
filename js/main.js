@@ -20,13 +20,78 @@ let imageInput;
 let lightbox;
 let lightboxImg;
 
+let productsBroadcast = null;
+
 const initSupabase = () => {
   if (window.supabase) {
     supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
     console.log("✅ Supabase инициализирован");
     fetchProducts(); // Загружаем товары и извлекаем категории из них
+    
+    // Настраиваем Realtime подписку для синхронизации между устройствами
+    setupRealtimeSync();
+    
+    // Настраиваем BroadcastChannel для синхронизации между вкладками
+    setupBroadcastChannel();
   } else {
     console.error("❌ Supabase библиотека не загружена");
+  }
+};
+
+// Realtime подписка для получения обновлений товаров
+const setupRealtimeSync = () => {
+  if (!supabaseClient) return;
+  
+  supabaseClient
+    .channel('products-changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'products' },
+      (payload) => {
+        console.log('📡 Изменение товаров получено:', payload);
+        
+        // Перезагружаем товары для синхронизации
+        fetchProducts();
+      }
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Realtime подписка активна');
+      }
+    });
+};
+
+// BroadcastChannel для синхронизации пустых категорий между вкладками
+const setupBroadcastChannel = () => {
+  if (!window.BroadcastChannel) {
+    console.warn('⚠️ BroadcastChannel не поддерживается');
+    return;
+  }
+  
+  try {
+    productsBroadcast = new BroadcastChannel('products-sync');
+    
+    productsBroadcast.onmessage = (event) => {
+      console.log('📢 Сообщение от другой вкладки:', event.data);
+      
+      if (event.data.type === 'categories-updated') {
+        // Синхронизируем пустые категории
+        const { categories } = event.data;
+        categories.forEach((categoryName) => {
+          const existing = document.querySelector(
+            `.category-section[data-category="${categoryName}"]`,
+          );
+          if (!existing) {
+            ensureCategoryExists(categoryName);
+          }
+        });
+      } else if (event.data.type === 'products-updated') {
+        // Полное обновление товаров
+        location.reload();
+      }
+    };
+  } catch (error) {
+    console.warn('⚠️ Не удалось создать BroadcastChannel:', error);
   }
 };
 
@@ -94,12 +159,20 @@ const sortProductsInCategory = (categoryName) => {
   });
 };
 
-// Сохраняем категории в localStorage
+// Сохраняем категории в localStorage и синхронизируем между вкладками
 const saveCategoriesLocally = () => {
   const categories = Array.from(
     document.querySelectorAll(".category-section"),
   ).map((section) => section.dataset.category);
   localStorage.setItem("categories", JSON.stringify(categories));
+  
+  // Уведомляем другие вкладки о изменении категорий
+  if (productsBroadcast) {
+    productsBroadcast.postMessage({
+      type: 'categories-updated',
+      categories: categories
+    });
+  }
 };
 
 // Загружаем категории из localStorage
@@ -151,6 +224,11 @@ async function fetchProducts() {
 
     // Загружаем сохраненные категории из localStorage
     const savedCategories = loadCategoriesLocally();
+    
+    // Очищаем только товары, но оставляем заголовки категорий
+    document.querySelectorAll(".product-card").forEach((card) => {
+      card.remove();
+    });
 
     if (data && data.length > 0) {
       emptyState.style.display = "none";
@@ -170,6 +248,7 @@ async function fetchProducts() {
       updateSelectOptions();
     } else {
       console.log("ℹ️ Товаров в базе не найдено");
+      emptyState.style.display = "flex";
     }
 
     // Восстанавливаем пустые категории из localStorage
@@ -597,7 +676,7 @@ window.deleteProduct = async (id) => {
     const categoryName = card.closest(".category-section")?.dataset.category;
     card.remove();
 
-    // Если категория стала пустой, скрываем её раздел, но оставляем в localStorage
+    // Если категория стала пустой, она остаётся видимой для синхронизации между устройствами
     if (categoryName) {
       const categorySection = document.querySelector(
         `.category-section[data-category="${categoryName}"]`,
@@ -606,8 +685,8 @@ window.deleteProduct = async (id) => {
         const productsInCategory =
           categorySection.querySelectorAll(".product-card").length || 0;
 
-        // Пустые категории остаются видимыми (не скрываем через display:none)
-        // Это обеспечивает синхронизацию между устройствами
+        // Сохраняем пустую категорию локально
+        saveCategoriesLocally();
       }
     }
   }
@@ -870,8 +949,16 @@ window.deleteCategory = (categoryName) => {
     emptyState.style.display = "flex";
   }
 
-  // Обновляем select
+  // Обновляем select и сохраняем изменения
   updateSelectOptions();
+  
+  // Синхронизируем удаление категории с другими вкладками
+  if (productsBroadcast) {
+    productsBroadcast.postMessage({
+      type: 'category-deleted',
+      categoryName: categoryName
+    });
+  }
 
   document.querySelector(".product-menu")?.remove();
 };
@@ -1048,6 +1135,20 @@ window.addEventListener("load", () => {
 
   // Инициализируем Supabase
   initSupabase();
+  
+  // Обновляем данные при возращении на вкладку (фокусе)
+  window.addEventListener('focus', () => {
+    console.log('🔄 Страница получила фокус, обновляем данные...');
+    fetchProducts();
+  });
+  
+  // Обновляем данные при возврате видимости страницы
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      console.log('👁️ Страница стала видимой, обновляем данные...');
+      fetchProducts();
+    }
+  });
 });
 
 // Дополнительный запрет на копирование через JavaScript
