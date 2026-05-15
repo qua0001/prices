@@ -85,6 +85,22 @@ const setupBroadcastChannel = () => {
             ensureCategoryExists(categoryName);
           }
         });
+      } else if (event.data.type === 'category-deleted') {
+        // Удаляем категорию на других вкладках
+        const { categoryName } = event.data;
+        const section = document.querySelector(
+          `.category-section[data-category="${categoryName}"]`,
+        );
+        if (section) {
+          section.remove();
+          console.log(`🗑️ Категория "${categoryName}" удалена на этой вкладке`);
+        }
+        
+        // Обновляем select и пустое состояние
+        if (document.querySelectorAll(".category-section").length === 0) {
+          emptyState.style.display = "flex";
+        }
+        updateSelectOptions();
       } else if (event.data.type === 'products-updated') {
         // Полное обновление товаров
         location.reload();
