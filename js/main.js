@@ -21,11 +21,16 @@ let lightbox;
 let lightboxImg;
 
 let productsBroadcast = null;
+let syncIntervalId = null;
 
 const initSupabase = () => {
   if (window.supabase) {
     supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
     console.log("✅ Supabase инициализирован");
+    
+    // Удаляем служебные записи из базы (если они остались)
+    cleanupSystemRecords();
+    
     fetchProducts(); // Загружаем товары и извлекаем категории из них
     
     // Настраиваем Realtime подписку для синхронизации между устройствами
@@ -33,8 +38,27 @@ const initSupabase = () => {
     
     // Настраиваем BroadcastChannel для синхронизации между вкладками
     setupBroadcastChannel();
+    
+    // Добавляем polling для надежной синхронизации между origin'ами
+    setupPollingSync();
   } else {
     console.error("❌ Supabase библиотека не загружена");
+  }
+};
+
+// Удаляем служебные записи из базы
+const cleanupSystemRecords = async () => {
+  if (!supabaseClient) return;
+  
+  try {
+    await supabaseClient
+      .from("products")
+      .delete()
+      .or("title.eq._CATEGORIES_META,category.eq._SYSTEM");
+    
+    console.log('🧹 Служебные записи удалены');
+  } catch (error) {
+    console.error('❌ Ошибка при удалении служебных записей:', error);
   }
 };
 
@@ -42,23 +66,57 @@ const initSupabase = () => {
 const setupRealtimeSync = () => {
   if (!supabaseClient) return;
   
-  supabaseClient
-    .channel('products-changes')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'products' },
-      (payload) => {
-        console.log('📡 Изменение товаров получено:', payload);
-        
-        // Перезагружаем товары для синхронизации
+  try {
+    supabaseClient
+      .channel('products-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        (payload) => {
+          console.log('📡 Realtime изменение получено:', payload.eventType);
+          
+          // Перезагружаем товары для синхронизации
+          fetchProducts();
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔌 Realtime статус:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime подписка активна');
+        }
+      });
+  } catch (error) {
+    console.error('❌ Ошибка Realtime подписки:', error);
+  }
+};
+
+// Polling для надежной синхронизации между разными origin'ами (Live Server vs GitHub Pages)
+const setupPollingSync = () => {
+  // Проверяем данные каждые 5 секунд
+  syncIntervalId = setInterval(async () => {
+    if (!supabaseClient) return;
+    
+    try {
+      const { data, error } = await supabaseClient
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      
+      // Получаем текущее количество товаров на странице
+      const currentCount = document.querySelectorAll(".product-card").length;
+      const newCount = data ? data.length : 0;
+      
+      // Если количество товаров изменилось, перезагружаем данные
+      if (currentCount !== newCount) {
+        console.log(`🔄 Polling: товаров было ${currentCount}, теперь ${newCount}. Обновляем...`);
         fetchProducts();
       }
-    )
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log('✅ Realtime подписка активна');
-      }
-    });
+    } catch (error) {
+      console.error('❌ Ошибка polling синхронизации:', error);
+    }
+  }, 5000); // 5 секунд
 };
 
 // BroadcastChannel для синхронизации пустых категорий между вкладками
@@ -246,9 +304,12 @@ async function fetchProducts() {
       card.remove();
     });
 
-    if (data && data.length > 0) {
+    // Фильтруем служебные записи (метаданные)
+    const products = data ? data.filter(p => p.title !== "_CATEGORIES_META" && p.category !== "_SYSTEM") : [];
+
+    if (products && products.length > 0) {
       emptyState.style.display = "none";
-      data.forEach((product) => {
+      products.forEach((product) => {
         renderProduct({
           id: product.id,
           title: product.title,
@@ -258,7 +319,7 @@ async function fetchProducts() {
           image: product.image,
         });
       });
-      console.log(`✅ Загружено ${data.length} товаров`);
+      console.log(`✅ Загружено ${products.length} товаров`);
 
       // Обновляем опции select на основе загруженных категорий
       updateSelectOptions();
@@ -407,6 +468,12 @@ window.ensureCategory = (categoryName) => {
 };
 
 const renderProduct = (product) => {
+  // Пропускаем служебные записи
+  if (product.category === "_SYSTEM" || product.title === "_CATEGORIES_META") {
+    console.log('🚫 Пропускаем служебную запись:', product);
+    return;
+  }
+
   // Гарантируем, что priceUnit всегда имеет значение
   const priceUnit = product.priceUnit || "шт";
 
@@ -1161,8 +1228,21 @@ window.addEventListener("load", () => {
   // Обновляем данные при возврате видимости страницы
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      console.log('👁️ Страница стала видимой, обновляем данные...');
+      console.log('👁️ Страница стала видимой, включаем polling...');
       fetchProducts();
+      
+      // Убедимся что polling работает
+      if (!syncIntervalId) {
+        setupPollingSync();
+      }
+    } else {
+      console.log('👁️ Страница скрыта, отключаем polling...');
+      
+      // Отключаем polling когда вкладка неактивна
+      if (syncIntervalId) {
+        clearInterval(syncIntervalId);
+        syncIntervalId = null;
+      }
     }
   });
 });
