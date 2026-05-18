@@ -400,22 +400,25 @@ const setupImageCropper = (file) => {
       
       // Устанавливаем обработчики событий
       const canvas = document.getElementById('image-cropper-canvas');
+      
+      // MOUSE EVENTS (ПК) - с инвертированным направлением
       canvas.addEventListener('mousedown', (e) => {
         cropperState.isDragging = true;
-        cropperState.dragStartX = e.offsetX;
-        cropperState.dragStartY = e.offsetY;
+        cropperState.dragStartX = e.clientX;
+        cropperState.dragStartY = e.clientY;
       });
       
       canvas.addEventListener('mousemove', (e) => {
         if (!cropperState.isDragging) return;
         
-        const deltaX = e.offsetX - cropperState.dragStartX;
-        const deltaY = e.offsetY - cropperState.dragStartY;
+        // ИНВЕРТИРУЕМ направление: dragStart - current = когда двигаем влево, offsetX уменьшается (изображение влево)
+        const deltaX = (cropperState.dragStartX - e.clientX) / 2;
+        const deltaY = (cropperState.dragStartY - e.clientY) / 2;
         
-        cropperState.offsetX += deltaX * 2;
-        cropperState.offsetY += deltaY * 2;
-        cropperState.dragStartX = e.offsetX;
-        cropperState.dragStartY = e.offsetY;
+        cropperState.offsetX += deltaX;
+        cropperState.offsetY += deltaY;
+        cropperState.dragStartX = e.clientX;
+        cropperState.dragStartY = e.clientY;
         
         drawCropper();
       });
@@ -427,6 +430,65 @@ const setupImageCropper = (file) => {
       canvas.addEventListener('mouseleave', () => {
         cropperState.isDragging = false;
       });
+      
+      // TOUCH EVENTS (МОБИЛЬНЫЙ)
+      let touchStartDistance = 0;
+      let touchPoints = [];
+      
+      canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        touchPoints = Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY }));
+        
+        if (e.touches.length === 1) {
+          cropperState.isDragging = true;
+          cropperState.dragStartX = e.touches[0].clientX;
+          cropperState.dragStartY = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+          cropperState.isDragging = false;
+          // Вычисляем расстояние между двумя пальцами для pinch-zoom
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          touchStartDistance = Math.sqrt(dx * dx + dy * dy);
+        }
+      }, { passive: false });
+      
+      canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        
+        if (e.touches.length === 1) {
+          // Drag - один палец
+          if (!cropperState.isDragging) return;
+          
+          const deltaX = (cropperState.dragStartX - e.touches[0].clientX) / 2;
+          const deltaY = (cropperState.dragStartY - e.touches[0].clientY) / 2;
+          
+          cropperState.offsetX += deltaX;
+          cropperState.offsetY += deltaY;
+          cropperState.dragStartX = e.touches[0].clientX;
+          cropperState.dragStartY = e.touches[0].clientY;
+          
+          drawCropper();
+        } else if (e.touches.length === 2) {
+          // Pinch-zoom - два пальца
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const currentDistance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (touchStartDistance > 0) {
+            const zoomDelta = (currentDistance - touchStartDistance) / 100;
+            cropperState.zoom = Math.max(0.5, Math.min(3, cropperState.zoom + zoomDelta * 0.5));
+            touchStartDistance = currentDistance;
+            drawCropper();
+          }
+        }
+      }, { passive: false });
+      
+      canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        cropperState.isDragging = false;
+        touchStartDistance = 0;
+        touchPoints = [];
+      }, { passive: false });
     };
     img.src = e.target.result;
   };
