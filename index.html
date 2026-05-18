@@ -73,6 +73,17 @@
         <div class="add-form__field">
           <label for="product-image">Фото товара (необязательно):</label>
           <input type="file" id="product-image" accept="image/*" class="add-form__image-input">
+          <!-- Image Cropper -->
+          <div id="image-cropper-container" style="display: none; margin-top: 15px; text-align: center;">
+            <div style="font-size: 14px; margin-bottom: 10px; color: #666;">Выберите часть изображения для формата 1х1</div>
+            <canvas id="image-cropper-canvas" width="200" height="200" style="border: 2px solid #ddd; border-radius: 5px; display: block; margin: 10px auto; background: #f5f5f5; cursor: grab;"></canvas>
+            <div style="display: flex; gap: 10px; justify-content: center; margin: 10px 0;">
+              <button type="button" id="crop-zoom-in" style="padding: 8px 15px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;">🔍+ Увеличить</button>
+              <button type="button" id="crop-zoom-out" style="padding: 8px 15px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;">🔍- Уменьшить</button>
+              <button type="button" id="crop-apply" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">✓ Применить</button>
+              <button type="button" id="crop-cancel" style="padding: 8px 15px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">✕ Отмена</button>
+            </div>
+          </div>
         </div>
         <div class="add-form__actions">
           <button type="submit" class="add-form__btn add-form__btn-submit">Добавить</button>

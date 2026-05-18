@@ -48,6 +48,10 @@ const initSupabase = () => {
 
 // Удаляем служебные записи из базы
 const cleanupSystemRecords = async () => {
+  // Очищаем localStorage от старых данных о пустых категориях
+  localStorage.removeItem("categories");
+  console.log('🧹 localStorage очищен');
+  
   if (!supabaseClient) return;
   
   try {
@@ -132,18 +136,7 @@ const setupBroadcastChannel = () => {
     productsBroadcast.onmessage = (event) => {
       console.log('📢 Сообщение от другой вкладки:', event.data);
       
-      if (event.data.type === 'categories-updated') {
-        // Синхронизируем пустые категории
-        const { categories } = event.data;
-        categories.forEach((categoryName) => {
-          const existing = document.querySelector(
-            `.category-section[data-category="${categoryName}"]`,
-          );
-          if (!existing) {
-            ensureCategoryExists(categoryName);
-          }
-        });
-      } else if (event.data.type === 'category-deleted') {
+      if (event.data.type === 'category-deleted') {
         // Удаляем категорию на других вкладках
         const { categoryName } = event.data;
         const section = document.querySelector(
@@ -191,6 +184,18 @@ let originalProductData = null;
 let lockedCategory = null;
 let productToMove = null;
 let isSubmitting = false; // Флаг для предотвращения двойной отправки
+let isLoadingProducts = false; // Флаг для отслеживания загрузки товаров
+
+// Image Cropper
+let cropperState = {
+  image: null,
+  zoom: 1,
+  offsetX: 0,
+  offsetY: 0,
+  isDragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+};
 
 const formatString = (str) => {
   if (!str) return "";
@@ -234,26 +239,7 @@ const sortProductsInCategory = (categoryName) => {
 };
 
 // Сохраняем категории в localStorage и синхронизируем между вкладками
-const saveCategoriesLocally = () => {
-  const categories = Array.from(
-    document.querySelectorAll(".category-section"),
-  ).map((section) => section.dataset.category);
-  localStorage.setItem("categories", JSON.stringify(categories));
-  
-  // Уведомляем другие вкладки о изменении категорий
-  if (productsBroadcast) {
-    productsBroadcast.postMessage({
-      type: 'categories-updated',
-      categories: categories
-    });
-  }
-};
 
-// Загружаем категории из localStorage
-const loadCategoriesLocally = () => {
-  const stored = localStorage.getItem("categories");
-  return stored ? JSON.parse(stored) : [];
-};
 
 // Функция для обновления опций select на основе существующих категорий
 const updateSelectOptions = () => {
@@ -276,9 +262,6 @@ const updateSelectOptions = () => {
     option.textContent = category;
     selectField.appendChild(option);
   });
-
-  // Сохраняем категории в localStorage
-  saveCategoriesLocally();
 };
 
 // Загружаем товары и извлекаем категории из них
@@ -288,6 +271,7 @@ async function fetchProducts() {
     return;
   }
 
+  isLoadingProducts = true;
   try {
     const { data, error } = await supabaseClient
       .from("products")
@@ -296,12 +280,10 @@ async function fetchProducts() {
 
     if (error) throw error;
 
-    // Загружаем сохраненные категории из localStorage
-    const savedCategories = loadCategoriesLocally();
-    
-    // Очищаем только товары, но оставляем заголовки категорий
-    document.querySelectorAll(".product-card").forEach((card) => {
-      card.remove();
+    // Очищаем все категории перед загрузкой новых
+    // Очищаем все категории и товары
+    document.querySelectorAll(".category-section").forEach((section) => {
+      section.remove();
     });
 
     // Фильтруем служебные записи (метаданные)
@@ -327,21 +309,10 @@ async function fetchProducts() {
       console.log("ℹ️ Товаров в базе не найдено");
       emptyState.style.display = "flex";
     }
-
-    // Восстанавливаем пустые категории из localStorage
-    savedCategories.forEach((categoryName) => {
-      const existing = document.querySelector(
-        `.category-section[data-category="${categoryName}"]`,
-      );
-      if (!existing) {
-        ensureCategoryExists(categoryName);
-      }
-    });
-
-    // Обновляем select еще раз со всеми категориями
-    updateSelectOptions();
   } catch (error) {
     console.error("❌ Ошибка загрузки данных:", error.message);
+  } finally {
+    isLoadingProducts = false;
   }
 }
 
@@ -378,6 +349,112 @@ window.showHistory = (id) => {
 
 window.closeHistory = () => {
   document.querySelector("#history-modal").style.display = "none";
+};
+
+// Image Cropper Functions
+const drawCropper = () => {
+  const canvas = document.getElementById('image-cropper-canvas');
+  if (!canvas || !cropperState.image) return;
+  
+  const ctx = canvas.getContext('2d');
+  const canvasSize = 200;
+  
+  // Очищаем canvas
+  ctx.fillStyle = '#f5f5f5';
+  ctx.fillRect(0, 0, canvasSize, canvasSize);
+  
+  // Рисуем изображение с масштабированием и смещением
+  const img = cropperState.image;
+  const scaledSize = Math.min(img.width, img.height) * cropperState.zoom;
+  
+  ctx.drawImage(
+    img,
+    Math.max(0, (img.width - scaledSize) / 2 + cropperState.offsetX),
+    Math.max(0, (img.height - scaledSize) / 2 + cropperState.offsetY),
+    scaledSize,
+    scaledSize,
+    0,
+    0,
+    canvasSize,
+    canvasSize
+  );
+  
+  // Рисуем рамку
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, canvasSize, canvasSize);
+};
+
+const setupImageCropper = (file) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      cropperState.image = img;
+      cropperState.zoom = 1;
+      cropperState.offsetX = 0;
+      cropperState.offsetY = 0;
+      
+      document.getElementById('image-cropper-container').style.display = 'block';
+      drawCropper();
+      
+      // Устанавливаем обработчики событий
+      const canvas = document.getElementById('image-cropper-canvas');
+      canvas.addEventListener('mousedown', (e) => {
+        cropperState.isDragging = true;
+        cropperState.dragStartX = e.offsetX;
+        cropperState.dragStartY = e.offsetY;
+      });
+      
+      canvas.addEventListener('mousemove', (e) => {
+        if (!cropperState.isDragging) return;
+        
+        const deltaX = e.offsetX - cropperState.dragStartX;
+        const deltaY = e.offsetY - cropperState.dragStartY;
+        
+        cropperState.offsetX += deltaX * 2;
+        cropperState.offsetY += deltaY * 2;
+        cropperState.dragStartX = e.offsetX;
+        cropperState.dragStartY = e.offsetY;
+        
+        drawCropper();
+      });
+      
+      canvas.addEventListener('mouseup', () => {
+        cropperState.isDragging = false;
+      });
+      
+      canvas.addEventListener('mouseleave', () => {
+        cropperState.isDragging = false;
+      });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+const getCroppedImage = (callback) => {
+  const canvas = document.getElementById('image-cropper-canvas');
+  const originalCanvas = document.createElement('canvas');
+  const size = Math.min(cropperState.image.width, cropperState.image.height);
+  
+  originalCanvas.width = size;
+  originalCanvas.height = size;
+  const ctx = originalCanvas.getContext('2d');
+  
+  ctx.drawImage(
+    cropperState.image,
+    Math.max(0, (cropperState.image.width - size * cropperState.zoom) / 2 + cropperState.offsetX),
+    Math.max(0, (cropperState.image.height - size * cropperState.zoom) / 2 + cropperState.offsetY),
+    size * cropperState.zoom,
+    size * cropperState.zoom,
+    0,
+    0,
+    size,
+    size
+  );
+  
+  callback(originalCanvas.toDataURL('image/jpeg', 0.9));
 };
 
 window.openForm = () => {
@@ -669,7 +746,37 @@ const attachFormSubmitListener = () => {
           }
         }
       } else {
+        // Проверяем что товар не добавлен уже в Supabase ещё до загрузки списка
         if (supabaseClient) {
+          // Если страница ещё грузит товары - предупреждаем пользователя
+          if (isLoadingProducts) {
+            const shouldContinue = confirm(
+              "Товары ещё загружаются. Продолжить добавление? Это может привести к дублированию."
+            );
+            if (!shouldContinue) {
+              return;
+            }
+          }
+          
+          // Ищем товар в БД по названию, цене и категории
+          const { data: existing, error: checkError } = await supabaseClient
+            .from("products")
+            .select("id")
+            .eq("title", productData.title)
+            .eq("price", productData.price)
+            .eq("category", productData.category);
+          
+          if (checkError) {
+            console.error('❌ Ошибка проверки дубликата:', checkError);
+            throw new Error("Ошибка при проверке в облако: " + checkError.message);
+          }
+          
+          if (existing && existing.length > 0) {
+            alert("Такой товар уже существует в этой категории!");
+            return;
+          }
+          
+          // Товар не найден - добавляем его
           const { data, error } = await supabaseClient
             .from("products")
             .insert([
@@ -756,20 +863,16 @@ window.deleteProduct = async (id) => {
 
   const card = document.querySelector(`.product-card[data-id="${id}"]`);
   if (card) {
-    const categoryName = card.closest(".category-section")?.dataset.category;
+    const categorySection = card.closest(".category-section");
+    const categoryName = categorySection?.dataset.category;
     card.remove();
 
-    // Если категория стала пустой, она остаётся видимой для синхронизации между устройствами
-    if (categoryName) {
-      const categorySection = document.querySelector(
-        `.category-section[data-category="${categoryName}"]`,
-      );
-      if (categorySection) {
-        const productsInCategory =
-          categorySection.querySelectorAll(".product-card").length || 0;
-
-        // Сохраняем пустую категорию локально
-        saveCategoriesLocally();
+    // Если категория стала пустой, удаляем её
+    if (categorySection) {
+      const productsInCategory = categorySection.querySelectorAll(".product-card").length;
+      if (productsInCategory === 0) {
+        categorySection.remove();
+        console.log(`🗑️ Категория "${categoryName}" удалена (больше нет товаров)`);
       }
     }
   }
@@ -1218,6 +1321,60 @@ window.addEventListener("load", () => {
 
   // Инициализируем Supabase
   initSupabase();
+  
+  // Image Cropper Event Handlers
+  setTimeout(() => {
+    const imageInput = document.getElementById('product-image');
+    if (imageInput) {
+      imageInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+          setupImageCropper(e.target.files[0]);
+        }
+      });
+    }
+    
+    const cropZoomIn = document.getElementById('crop-zoom-in');
+    const cropZoomOut = document.getElementById('crop-zoom-out');
+    const cropApply = document.getElementById('crop-apply');
+    const cropCancel = document.getElementById('crop-cancel');
+    
+    if (cropZoomIn) {
+      cropZoomIn.addEventListener('click', (e) => {
+        e.preventDefault();
+        cropperState.zoom = Math.min(3, cropperState.zoom + 0.2);
+        drawCropper();
+      });
+    }
+    
+    if (cropZoomOut) {
+      cropZoomOut.addEventListener('click', (e) => {
+        e.preventDefault();
+        cropperState.zoom = Math.max(0.5, cropperState.zoom - 0.2);
+        drawCropper();
+      });
+    }
+    
+    if (cropApply) {
+      cropApply.addEventListener('click', (e) => {
+        e.preventDefault();
+        getCroppedImage((croppedData) => {
+          // Сохраняем cropped image в переменную, чтобы использовать при отправке формы
+          window.croppedImageData = croppedData;
+          document.getElementById('image-cropper-container').style.display = 'none';
+          console.log('✓ Изображение обрезано и готово к использованию');
+        });
+      });
+    }
+    
+    if (cropCancel) {
+      cropCancel.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('image-cropper-container').style.display = 'none';
+        document.getElementById('product-image').value = '';
+        window.croppedImageData = null;
+      });
+    }
+  }, 100);
   
   // Обновляем данные при возращении на вкладку (фокусе)
   window.addEventListener('focus', () => {
